@@ -71,6 +71,9 @@ than on the couch. A switcher at the top of every lesson (it remembers your choi
 | 🔧 **Do** | Go to the bench and do this — steps to tick, and pass marks to judge yourself against |
 | 🧠 **Recall** | Flip cards. Get tested rather than re-reading |
 
+She picks her default during onboarding, so the very first lesson opens the way she likes. Every
+lesson still has all five, one tap apart.
+
 This is not the "learning styles" myth (matching teaching to a preferred sense has never held up in
 studies). It is two things that *are* well evidenced: presenting the same idea in several forms, and
 **retrieval practice** — being made to recall something is far stronger than reading it again. The
@@ -104,15 +107,58 @@ are all done. You cannot read your way to proficient.
 
 ### The companion half
 
-- **🩺 Weld Doctor** — tick what you can see, hear or remember ("small holes in the bead", "it was
-  windy", "a crack turned up two days later") and it ranks the likely faults with *why it happened →
-  fix it now → stop it happening again*, plus which process it bites you on. 15 clues, 13 defects.
-  It shows the top two or three rather than one confident answer, because faults ride together.
+- **👷 Ask Old Mate** — the bloke who has been welding since before you were born. Tick what you can
+  see, hear or remember ("small holes in the bead", "it was windy", "a crack turned up two days
+  later") and he ranks the likely faults with *why it happened → fix it now → stop it happening
+  again*, plus which process it bites you on. 15 clues, 13 defects. He gives you the top two or
+  three rather than one confident answer, because faults ride together.
 - **📋 Cheat sheets** — starting amps by electrode size for stick; volts and wire speed by plate
   thickness for MIG; tungsten, amps and filler by thickness for TIG; fillet sizes and joint prep.
 - **✅ Pre-flight checklist** — PPE, area, machine and metal, pack-up. Resets each day.
 - **📓 Weld log** — photo straight from the camera, what you were doing, what went wrong. Images are
   resized to 1000 px before storing so a few photos don't fill the browser's quota.
+- **💰 Scrap & prices** — see below.
+
+### Read it to me
+
+Every lesson has a play bar: it reads the theory out loud, sentence by sentence, highlighting the
+line it is on. Study in the ute, at the sink, or with the phone in a pocket.
+
+It uses the phone's own speech engine (Web Speech API) — **no audio files, no API, no account**, and
+Android's offline voices keep working with no signal. Voice and speed are picked in Settings; speed
+also cycles from the bar itself. It reads whichever mode she is in, so "Do" mode reads the drill
+steps out while her hands are busy.
+
+### The menu
+
+A drawer from the top-left lists **everything**: all nine units with their progress, Old Mate, the
+four Field Kit pages, the map and Settings. The bottom tabs stay for the four places she goes
+constantly; the drawer is the contents page.
+
+### Scrap & prices
+
+Metal is the trade around the trade, so the app tracks what it is worth — a ticker on the map, and a
+full page in the Field Kit.
+
+| Shown | Source | Unit |
+|-------|--------|------|
+| Copper, gold, silver, platinum, palladium | api.gold-api.com | per kg (and per gram for the precious ones), in AUD |
+| Bitcoin | CoinGecko | per coin in AUD, with the day's move |
+| USD → AUD | api.frankfurter.dev | — |
+
+All three are free, need no key, and are CORS-open so the phone calls them directly. Prices cache,
+so with no signal you get the last ones with the time they were fetched rather than an error — and
+fetching is deferred until after paint, so a bad connection never delays a page.
+
+**No oil.** There is no free source a browser can call directly for it (Yahoo's endpoint blocks
+cross-origin requests), and faking it would be worse than leaving it out.
+
+Underneath the prices is the part that actually matters: six sections on **what a yard really pays**
+(spot is the ceiling, not the offer), the metals that pay and how to tell them apart, sorting to get
+the clean-grade price, what must never go in the trailer (gas bottles, sealed drums, lithium,
+asbestos), the ID-and-EFT paperwork that scrap is now regulated by in several states, and how all of
+it feeds back into welding — offcuts as practice stock, and metal identification being the same
+skill as unit 8.
 
 ---
 
@@ -185,6 +231,8 @@ weld-academy/
   js/progress.js             XP, levels, streaks, badges, drills, proficiency, storage
   js/juice.js                sparks, celebrations, sound, haptics, count-ups
   js/vision.js               the optional AI scan, provider-pluggable
+  js/narrator.js             read-aloud, on the phone's own speech engine
+  js/market.js               metal and Bitcoin prices, cached and offline-safe
   js/app.js                  router, views, event wiring
   tools/validate-content.mjs content integrity checks
   tools/e2e-smoke.cjs        full browser walkthrough
@@ -203,6 +251,11 @@ drill and two recall cards. Progress, percentages, unlocks and the map all count
 **Add a defect:** add to `defects` in `js/reference.js` and weight it against clue ids in `match`.
 
 **Add a diagram:** add to `js/diagrams.js` and point a lesson at it in `WA_DIAGRAM_MAP`.
+
+**On diagram sharpness:** they are inline SVG — vector, not images — so they are resolution
+independent and render pin-sharp at any zoom and on any pixel density, which no PNG can do. They
+also share a gradient and glow palette (`#gPlate`, `#gWeld`, `#gTung`, `#fGlow`, defined once in
+`index.html`) so plates have depth and the bead reads as molten rather than flat orange.
 
 **Checks:**
 

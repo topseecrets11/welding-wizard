@@ -25,6 +25,27 @@
     </noscript>
   </main>
 
+  <!-- Shared paint for the diagrams. SVG gradients have to live in the
+       document; the .d-* CSS classes reference these by id. -->
+  <svg class="d-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
+    <linearGradient id="gPlate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5b6675"/><stop offset="0.55" stop-color="#46505f"/><stop offset="1" stop-color="#39424f"/>
+    </linearGradient>
+    <linearGradient id="gWeld" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd894"/><stop offset="0.45" stop-color="#ffa62b"/><stop offset="1" stop-color="#e07d0a"/>
+    </linearGradient>
+    <linearGradient id="gTung" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e6ecf3"/><stop offset="1" stop-color="#9aa6b4"/>
+    </linearGradient>
+    <linearGradient id="gPipe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5b6675"/><stop offset="0.5" stop-color="#46505f"/><stop offset="1" stop-color="#333c48"/>
+    </linearGradient>
+    <filter id="fGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs></svg>
+
   <nav id="tabbar" class="tabbar"></nav>
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
@@ -36,6 +57,8 @@
   <script src="js/progress.js"></script>
   <script src="js/juice.js"></script>
   <script src="js/vision.js"></script>
+  <script src="js/narrator.js"></script>
+  <script src="js/market.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

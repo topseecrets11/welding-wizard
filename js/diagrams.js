@@ -43,8 +43,8 @@ window.WA_DIAGRAMS = (function () {
     '<g transform="translate(190,20)">' +
       '<rect class="d-plate" x="0" y="48" width="84" height="12"/>' +
       '<rect class="d-plate" x="36" y="10" width="12" height="38"/>' +
-      '<path class="d-weld" d="M36 48 l-12 0 q11 -1 12 -12 z"/>' +
-      '<path class="d-weld" d="M48 48 l12 0 q-11 -1 -12 -12 z"/>' +
+      '<path class="d-weld" d="M36 48 h-12 q6 -6 12 -12 z"/>' +
+      '<path class="d-weld" d="M48 48 h12 q-6 -6 -12 -12 z"/>' +
       '<text class="d-lbl" x="42" y="80" text-anchor="middle">Tee</text>' +
     '</g>' +
     // corner
@@ -79,7 +79,7 @@ window.WA_DIAGRAMS = (function () {
     '<g transform="translate(130,25)">' +
       '<rect class="d-plate" x="26" y="0" width="12" height="55"/>' +
       '<rect class="d-plate" x="26" y="43" width="50" height="12"/>' +
-      '<path class="d-weld" d="M38 43 l14 0 q-13 -1 -14 -14 z"/>' +
+      '<path class="d-weld" d="M38 43 h14 q-7 -7 -14 -14 z"/>' +
       '<text class="d-lbl" x="45" y="72" text-anchor="middle">PB · horizontal</text>' +
       '<text class="d-lbl d-dim" x="45" y="88" text-anchor="middle">2F fillet</text>' +
     '</g>' +
@@ -109,7 +109,7 @@ window.WA_DIAGRAMS = (function () {
     '<g transform="translate(60,20)">' +
       '<rect class="d-plate" x="0" y="120" width="200" height="20"/>' +
       '<rect class="d-plate" x="0" y="20" width="20" height="100"/>' +
-      '<path class="d-weld" d="M20 120 h60 q-4 -55 -60 -60 z"/>' +
+      '<path class="d-weld" d="M20 120 h60 q-20 -20 -60 -60 z"/>' +
 
       // leg along the bottom plate
       '<line class="d-line" x1="20" y1="152" x2="80" y2="152"/>' +
@@ -180,11 +180,11 @@ window.WA_DIAGRAMS = (function () {
       if (i === 0) {
         art = '<rect class="d-plate" x="0" y="46" width="76" height="16"/>' +
               '<rect class="d-plate" x="0" y="0" width="16" height="46"/>' +
-              '<path class="d-weld" d="M16 46 h34 q-3 -31 -34 -34 z"/>';
+              '<path class="d-weld" d="M16 46 h34 q-12 -12 -34 -34 z"/>';
       } else if (i === 1) {
         art = '<rect class="d-plate" x="0" y="46" width="76" height="16"/>' +
               '<rect class="d-plate" x="0" y="0" width="16" height="46"/>' +
-              '<path class="d-weld" d="M16 46 h32 q-3 -31 -32 -34 z"/>' +
+              '<path class="d-weld" d="M16 46 h32 q-11 -11 -32 -34 z"/>' +
               '<path class="d-bad" d="M44 46 q6 -7 11 0 q-6 3 -11 0 z"/>' +
               '<circle class="d-ring" cx="49" cy="45" r="13"/>';
       } else if (i === 2) {
@@ -195,7 +195,7 @@ window.WA_DIAGRAMS = (function () {
       } else if (i === 3) {
         art = '<rect class="d-plate" x="0" y="46" width="76" height="16"/>' +
               '<rect class="d-plate" x="0" y="0" width="16" height="46"/>' +
-              '<path class="d-weld" d="M18 46 h32 q-3 -29 -32 -32 z"/>' +
+              '<path class="d-weld" d="M18 46 h32 q-11 -11 -32 -32 z"/>' +
               '<path class="d-bad" d="M17 45 l0 -30 l2.5 0 l0 30 z"/>' +
               '<circle class="d-ring" cx="20" cy="30" r="13"/>';
       } else if (i === 4) {
@@ -208,7 +208,7 @@ window.WA_DIAGRAMS = (function () {
       } else {
         art = '<rect class="d-plate" x="0" y="46" width="76" height="16"/>' +
               '<rect class="d-plate" x="0" y="0" width="16" height="46"/>' +
-              '<path class="d-weld" d="M16 46 h34 q-3 -31 -34 -34 z"/>' +
+              '<path class="d-weld" d="M16 46 h34 q-12 -12 -34 -34 z"/>' +
               '<circle class="d-bad" cx="26" cy="38" r="3.5"/>' +
               '<circle class="d-bad" cx="35" cy="30" r="2.5"/>' +
               '<circle class="d-bad" cx="31" cy="20" r="3"/>' +

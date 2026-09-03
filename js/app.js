@@ -23,6 +23,8 @@
   var DG = window.WA_DIAGRAMS;
   var PR = window.WA_PRACTICE;
   var V = window.WA_VISION;
+  var N = window.WA_NARRATOR;
+  var MK = window.WA_MARKET;
 
   var view, header, tabbar, toastHost;
   var shownXp = 0;                 // what the header is currently displaying
@@ -131,6 +133,7 @@
     var s = P.state;
 
     header.innerHTML =
+      '<button class="hdr-menu" id="menuBtn" aria-label="Menu"><span></span><span></span><span></span></button>' +
       '<a class="hdr-left" href="#/home">' +
         '<div class="hdr-ring">' + ring(pct, 'var(--accent)', 40, 3) +
           '<span class="hdr-lvl">' + lvl + '</span>' +
@@ -151,13 +154,78 @@
       J.countUp($('#hdrXp'), shownXp, s.xp, 650);
       shownXp = s.xp;
     }
+
+    $('#menuBtn').addEventListener('click', openMenu);
+  }
+
+  /* ============================ the menu ================================ */
+
+  /* A proper contents page. The bottom tabs are for the four places she goes
+     constantly; this is everything, in one list, always one tap away. */
+  function openMenu() {
+    tap();
+    var wrap = document.createElement('div');
+    wrap.className = 'drawer';
+    wrap.innerHTML =
+      '<div class="drawer-panel">' +
+        '<div class="drawer-head">' +
+          '<div>' +
+            '<div class="drawer-name">' + esc(P.state.name || 'Welder') + '</div>' +
+            '<div class="drawer-sub">' + esc(P.levelTitle()) + ' · Level ' + P.level() + ' · ' + P.state.xp + ' XP</div>' +
+          '</div>' +
+          '<button class="drawer-x" aria-label="Close">✕</button>' +
+        '</div>' +
+
+        '<div class="drawer-scroll">' +
+          '<div class="drawer-sec">The course</div>' +
+          C.modules.map(function (m, i) {
+            var pct = P.modulePercent(m.id);
+            var locked = !P.moduleUnlocked(m.id);
+            return '<a class="drawer-item' + (locked ? ' is-locked' : '') + '" href="#/module/' + m.id + '">' +
+              '<span class="drawer-ico">' + m.icon + '</span>' +
+              '<span class="drawer-txt"><b>' + (i + 1) + '. ' + esc(m.title) + '</b>' +
+                '<i>' + esc(m.subtitle) + (m.tier === 'mastery' ? ' · mastery' : '') + '</i></span>' +
+              '<span class="drawer-pct">' + pct + '%</span>' +
+            '</a>';
+          }).join('') +
+
+          '<div class="drawer-sec">In the shed</div>' +
+          [['#/doctor', '👷', 'Ask Old Mate', 'Something wrong with a weld'],
+           ['#/kit/checklist', '✅', 'Pre-flight checklist', 'Before the helmet goes down'],
+           ['#/kit/sheets', '📋', 'Cheat sheets', 'Amps, volts, gas, sizes'],
+           ['#/kit/log', '📓', 'Weld log', 'Your own record'],
+           ['#/kit/scrap', '💰', 'Scrap & prices', 'What metal is worth today']
+          ].map(function (r) {
+            return '<a class="drawer-item" href="' + r[0] + '">' +
+              '<span class="drawer-ico">' + r[1] + '</span>' +
+              '<span class="drawer-txt"><b>' + r[2] + '</b><i>' + r[3] + '</i></span></a>';
+          }).join('') +
+
+          '<div class="drawer-sec">Yours</div>' +
+          '<a class="drawer-item" href="#/home"><span class="drawer-ico">🗺️</span>' +
+            '<span class="drawer-txt"><b>The map</b><i>Progress, badges, daily challenge</i></span></a>' +
+          '<a class="drawer-item" href="#/settings"><span class="drawer-ico">⚙️</span>' +
+            '<span class="drawer-txt"><b>Settings</b><i>Voice, sound, AI scan, reset</i></span></a>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(wrap);
+    requestAnimationFrame(function () { wrap.classList.add('is-in'); });
+
+    function close() {
+      wrap.classList.remove('is-in');
+      setTimeout(function () { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 260);
+    }
+    wrap.addEventListener('click', function (e) {
+      if (e.target === wrap || e.target.closest('.drawer-x') || e.target.closest('.drawer-item')) close();
+    });
   }
 
   function renderTabs(active) {
     var tabs = [
       { id: 'home', href: '#/home', icon: '🗺️', label: 'Map' },
       { id: 'course', href: '#/course', icon: '📚', label: 'Course' },
-      { id: 'doctor', href: '#/doctor', icon: '🩺', label: 'Doctor' },
+      { id: 'doctor', href: '#/doctor', icon: '👷', label: 'Old Mate' },
       { id: 'kit', href: '#/kit/checklist', icon: '🧰', label: 'Kit' }
     ];
     tabbar.innerHTML = tabs.map(function (t) {
@@ -184,13 +252,39 @@
         '</div>' +
         '<label class="welcome-label" for="wname">What should I call you?</label>' +
         '<input id="wname" class="input" type="text" placeholder="Your name" maxlength="24" autocomplete="off">' +
+        '<label class="welcome-label">How do you like to take things in?</label>' +
+        '<div class="style-pick" id="stylePick">' +
+          [['read', '📖', 'Read it', 'Give me the whole thing'],
+           ['guts', '⚡', 'Just the guts', 'Bullet points, no waffle'],
+           ['show', '👁️', 'Show me', 'Pictures first'],
+           ['do', '🔧', 'Let me do it', 'Straight to the bench']
+          ].map(function (o, i) {
+            return '<button class="style-opt' + (i === 0 ? ' is-on' : '') + '" data-style="' + o[0] + '">' +
+              '<span class="style-i">' + o[1] + '</span>' +
+              '<span class="style-t"><b>' + o[2] + '</b><i>' + o[3] + '</i></span></button>';
+          }).join('') +
+        '</div>' +
+        '<p class="welcome-fine">Every lesson has all five — this just picks which one opens first. Switch any time.</p>' +
         '<button class="btn btn--primary btn--big" id="wstart">Strike an arc →</button>' +
         '<p class="welcome-fine">Everything stays on this device. No account, no internet needed.</p>' +
       '</div>';
 
     var input = $('#wname');
+    var chosenStyle = 'read';
+
+    $('#stylePick').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-style]');
+      if (!btn) return;
+      chosenStyle = btn.getAttribute('data-style');
+      $('#stylePick').querySelectorAll('.style-opt').forEach(function (b) {
+        b.classList.toggle('is-on', b === btn);
+      });
+      J.sound('tap');
+    });
+
     function start() {
       P.setName((input.value || '').trim() || 'Welder');
+      P.setPrefMode(chosenStyle);
       header.classList.remove('hidden');
       tabbar.classList.remove('hidden');
       J.sound('level');
@@ -251,6 +345,10 @@
         '</div>' +
       '</div>' +
       continueCard +
+      '<a class="ticker" href="#/kit/scrap" id="ticker">' +
+        '<span class="ticker-tag">💰 Metal</span>' +
+        '<span class="ticker-rail" id="tickerRail"><span class="ticker-load">checking prices…</span></span>' +
+      '</a>' +
       dailyCardHtml() +
       '<h2 class="section-h">The road to a ticket</h2>' +
       '<div class="map">' + mapHtml() + '</div>' +
@@ -262,6 +360,89 @@
       '</div>';
 
     wireDaily();
+    paintTicker();
+    afterPaint(function () { MK.refresh().then(paintTicker); });
+  }
+
+  /* Prices are the least important thing on any screen — never let fetching
+     them hold up the load event or first paint on a bad connection. */
+  function afterPaint(fn) {
+    if (document.readyState === 'complete') setTimeout(fn, 60);
+    else window.addEventListener('load', function () { setTimeout(fn, 60); }, { once: true });
+  }
+
+  function paintTicker() {
+    var rail = $('#tickerRail');
+    if (!rail) return;
+    var rows = MK.rows().filter(function (r) { return r.have; });
+    if (!rows.length) {
+      rail.innerHTML = '<span class="ticker-load">' +
+        (navigator.onLine ? 'checking prices…' : 'no signal — tap for the scrap guide') + '</span>';
+      return;
+    }
+    rail.innerHTML = rows.map(function (r) {
+      var chg = r.change == null ? '' :
+        '<i class="' + (r.change >= 0 ? 'up' : 'down') + '">' +
+          (r.change >= 0 ? '▲' : '▼') + Math.abs(r.change).toFixed(1) + '%</i>';
+      return '<span class="tick"><b>' + r.icon + ' ' + esc(r.name) + '</b> ' + r.primary + chg + '</span>';
+    }).join('');
+  }
+
+  /* ============================ scrap & prices ========================== */
+
+  function kitScrap() {
+    var rows = MK.rows();
+    var ago = MK.fetchedAgo();
+
+    return '<p class="page-sub">Spot prices in Australian dollars, in the units a yard weighs in. ' +
+        'Metal is the trade around your trade — and knowing what it is worth is the same skill as knowing what it is.</p>' +
+
+      '<div class="prices" id="prices">' +
+        rows.map(function (r) {
+          var chg = r.change == null ? '' :
+            '<span class="price-chg ' + (r.change >= 0 ? 'up' : 'down') + '">' +
+              (r.change >= 0 ? '▲ ' : '▼ ') + Math.abs(r.change).toFixed(1) + '% today</span>';
+          return '<div class="price' + (r.scrap ? ' is-star' : '') + '">' +
+            '<div class="price-top"><span class="price-ico">' + r.icon + '</span>' +
+              '<span class="price-name">' + esc(r.name) + '</span>' + chg + '</div>' +
+            '<div class="price-val">' + r.primary + '</div>' +
+            '<div class="price-unit">' + esc(r.secondary) + '</div>' +
+            '<div class="price-note">' + esc(r.note) + '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+
+      '<div class="price-foot" id="priceFoot">' +
+        '<span>' + (ago ? 'Updated ' + ago : 'Not fetched yet') + '</span>' +
+        '<button class="btn btn--ghost btn--sm" id="priceRefresh">Refresh</button>' +
+      '</div>' +
+      (MK.state.error ? '<p class="muted small">' + esc(MK.state.error) + '</p>' : '') +
+
+      '<div class="card card--warn">' +
+        '<b>Read this before you load the trailer</b>' +
+        '<p>Those are world spot prices — the ceiling, not the offer. A yard buys at a discount because they sort, cart and on-sell it. ' +
+        'And no oil price up there: there is no free source a phone can call directly, so rather than fake it, it is left out.</p>' +
+      '</div>' +
+
+      R.scrapGuide.map(function (sec) {
+        return '<div class="card card--scrap">' +
+          '<h3>' + sec.icon + ' ' + esc(sec.title) + '</h3>' +
+          sec.body.map(function (b) { return '<p>' + fmt(b) + '</p>'; }).join('') +
+          '<ul>' + sec.points.map(function (pt) { return '<li>' + fmt(pt) + '</li>'; }).join('') + '</ul>' +
+        '</div>';
+      }).join('');
+  }
+
+  function wireScrap() {
+    afterPaint(function () { MK.refresh().then(function () { renderKit('scrap'); }); });
+    var btn = $('#priceRefresh');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        tap();
+        btn.textContent = 'Checking…';
+        MK.refresh({ force: true }).then(function () { renderKit('scrap'); });
+      });
+    }
   }
 
   function mapHtml() {
@@ -485,6 +666,7 @@
         }).join('') +
       '</div>' +
       '<div class="mode-hint" id="modeHint">' + esc((MODES.filter(function (x) { return x.id === mode; })[0] || {}).hint || '') + '</div>' +
+      narratorBarHtml() +
       '<div id="lessonBody">' + lessonBody(m, l, mode) + '</div>' +
       '<div class="lesson-actions">' +
         '<button class="btn btn--primary btn--big" id="doneBtn">' +
@@ -504,15 +686,92 @@
       $('#modeHint').textContent = (MODES.filter(function (x) { return x.id === id; })[0] || {}).hint || '';
       $('#lessonBody').innerHTML = lessonBody(m, l, id);
       wireLessonBody(m, l, id);
+      buildScript();
     });
 
     wireLessonBody(m, l, mode);
+    wireNarrator();
 
     $('#doneBtn').addEventListener('click', function (e) {
       var res = P.completeLesson(m.id, l.id);
       announce(res, { from: e.currentTarget });
       var nextHref = isLast ? '#/quiz/' + m.id : '#/lesson/' + m.id + '/' + m.lessons[idx + 1].id;
       setTimeout(function () { go(nextHref); }, res.xp ? 420 : 0);
+    });
+  }
+
+  /* ---- read it to me ---- */
+
+  var RATES = [0.8, 1, 1.15, 1.35, 1.6];
+
+  function narratorBarHtml() {
+    if (!N.supported()) return '';
+    return '<div class="reader" id="reader">' +
+      '<button class="reader-btn reader-play" id="readPlay" aria-label="Read aloud">▶</button>' +
+      '<button class="reader-btn" id="readBack" aria-label="Back a sentence">↺</button>' +
+      '<button class="reader-btn" id="readFwd" aria-label="Forward a sentence">↻</button>' +
+      '<div class="reader-meta">' +
+        '<div class="reader-label" id="readLabel">Read it to me</div>' +
+        '<div class="reader-track"><span id="readBar"></span></div>' +
+      '</div>' +
+      '<button class="reader-btn reader-rate" id="readRate">' + N.getRate() + '×</button>' +
+    '</div>';
+  }
+
+  /* The script is built from what is actually on screen, so it follows her
+     into whichever mode she is reading in. */
+  function buildScript() {
+    if (!N.supported()) return;
+    var els = [];
+    var head = $('.lesson-head h1');
+    if (head) els.push(head);
+    var body = $('#lessonBody');
+    if (body) {
+      body.querySelectorAll('.prose p, .gut, .tile, .tipbox p, .keybox li, .drill-head h2, .drill-why, .drill-steps li, .drill-pass li, .flip-front p, .flip-back p, .mode-lead')
+        .forEach(function (el) { els.push(el); });
+    }
+    N.setScript(els);
+    paintReader(N.status());
+  }
+
+  function paintReader(st) {
+    var bar = $('#reader');
+    if (!bar) return;
+    $('#readPlay').textContent = st.playing && !st.paused ? '❚❚' : '▶';
+    bar.classList.toggle('is-live', st.playing);
+    $('#readRate').textContent = st.rate + '×';
+    $('#readLabel').textContent = !st.total ? 'Nothing to read here'
+      : st.playing ? (st.paused ? 'Paused' : 'Reading') + ' · ' + (st.index + 1) + ' of ' + st.total
+      : 'Read it to me · ' + st.total + ' bits';
+    $('#readBar').style.width = st.total ? Math.round((st.index / st.total) * 100) + '%' : '0%';
+
+    document.querySelectorAll('.is-reading').forEach(function (el) { el.classList.remove('is-reading'); });
+    if (st.playing && st.current && st.current.el) {
+      st.current.el.classList.add('is-reading');
+      if (!J.reducedMotion()) {
+        var r = st.current.el.getBoundingClientRect();
+        if (r.top < 90 || r.bottom > window.innerHeight - 90) {
+          st.current.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+  }
+
+  function wireNarrator() {
+    if (!N.supported()) return;
+    buildScript();
+
+    N.offChange(paintReader);
+    N.onChange(paintReader);
+
+    $('#readPlay').addEventListener('click', function () { tap(); N.toggle(); });
+    $('#readBack').addEventListener('click', function () { tap(); N.skip(-1); });
+    $('#readFwd').addEventListener('click', function () { tap(); N.skip(1); });
+    $('#readRate').addEventListener('click', function () {
+      tap();
+      var i = RATES.indexOf(N.getRate());
+      N.setRate(RATES[(i + 1) % RATES.length]);
+      paintReader(N.status());
     });
   }
 
@@ -785,8 +1044,11 @@
     }).join('');
 
     view.innerHTML =
-      '<h1 class="page-h">🩺 Weld Doctor</h1>' +
-      '<p class="page-sub">Something not right? Tick what you can see, hear or remember. You do not need to know the names — that is my end.</p>' +
+      '<div class="mate-head">' +
+        '<div class="mate-face">👷</div>' +
+        '<div><h1>Ask Old Mate</h1>' +
+        '<p>Been welding since before you were born. Tell him what you can see, hear or remember — you do not need to know the names, that is his end.</p></div>' +
+      '</div>' +
       (V.isConfigured() ? cameraCardHtml() : '') +
       '<div id="clueHost">' + cluesHtml + '</div>' +
       '<div class="doctor-actions">' +
@@ -795,8 +1057,8 @@
       '</div>' +
       '<div id="dxResults"></div>' +
       (V.isConfigured() ? '' :
-        '<p class="footer-note small">Want it to look at a photo and tick these for you? ' +
-        '<a href="#/settings">Set up AI weld scan</a> — optional, and the checklist works fine without it.</p>');
+        '<p class="footer-note small">Want Old Mate to look at a photo and tick these for you? ' +
+        '<a href="#/settings">Set up the camera scan</a> — optional, and the checklist works fine without it.</p>');
 
     $('#clueHost').addEventListener('change', function (e) {
       var cb = e.target.closest('[data-clue]');
@@ -829,7 +1091,7 @@
     return '<div class="card card--camera" id="cameraCard">' +
       '<label class="file-btn file-btn--cam">' +
         '<input type="file" accept="image/*" capture="environment" id="scanPhoto">' +
-        '<span><b>📸 Scan the weld</b><i>Point the camera at it — the model spots it, the Doctor names it</i></span>' +
+        '<span><b>📸 Show Old Mate a photo</b><i>Point the camera at the weld — it spots it, he names it</i></span>' +
       '</label>' +
       '<div id="scanResult"></div>' +
     '</div>';
@@ -894,14 +1156,14 @@
     var host = $('#dxResults');
 
     if (!results.length) {
-      host.innerHTML = '<div class="card"><p>Nothing in my book matches that combination. Photograph it into the weld log and show someone who can put hands on it — that is the honest answer.</p></div>';
+      host.innerHTML = '<div class="card"><p>Old Mate is stumped — nothing in his book matches that combination. Photograph it into the weld log and put it in front of someone who can get hands on it. That is the honest answer.</p></div>';
       return;
     }
 
     var maxScore = results[0].score;
 
     host.innerHTML =
-      '<h2 class="section-h">What I reckon it is</h2>' +
+      '<h2 class="section-h">What Old Mate reckons</h2>' +
       (results.length > 1 ? '<p class="page-sub small">Ranked most to least likely. Two faults often ride together, so read past the first one.</p>' : '') +
       results.map(function (r, i) {
         var d = r.defect;
@@ -950,10 +1212,14 @@
     var tabs = [
       { id: 'checklist', label: '✅ Pre-flight' },
       { id: 'sheets', label: '📋 Cheat sheets' },
-      { id: 'log', label: '📓 Weld log' }
+      { id: 'log', label: '📓 Weld log' },
+      { id: 'scrap', label: '💰 Scrap & prices' }
     ];
 
-    var body = tab === 'sheets' ? kitSheets() : tab === 'log' ? kitLog() : kitChecklist();
+    var body = tab === 'sheets' ? kitSheets()
+             : tab === 'log' ? kitLog()
+             : tab === 'scrap' ? kitScrap()
+             : kitChecklist();
 
     view.innerHTML =
       '<h1 class="page-h">🧰 Field Kit</h1>' +
@@ -966,6 +1232,7 @@
 
     if (tab === 'checklist') wireChecklist();
     if (tab === 'log') wireLog();
+    if (tab === 'scrap') wireScrap();
   }
 
   function kitChecklist() {
@@ -1144,6 +1411,24 @@
         '<p class="muted small">Haptics follow your phone\'s own vibration setting.</p>' +
       '</div>' +
 
+      (N.supported() ? '<div class="card">' +
+        '<h3>🔊 Read it to me</h3>' +
+        '<p class="muted small">Every lesson has a play button. It uses your phone\'s own voice, so it keeps working with no signal — good for studying in the ute.</p>' +
+        '<label class="field"><span>Voice</span><select class="input" id="voicePick">' +
+          '<option value="">Phone default</option>' +
+          N.voices().map(function (v) {
+            return '<option value="' + esc(v.name) + '"' + (v.name === N.currentVoiceName() ? ' selected' : '') + '>' +
+              esc(v.name) + ' (' + esc(v.lang) + ')' + (v.localService ? ' · offline' : '') + '</option>';
+          }).join('') +
+        '</select></label>' +
+        '<label class="field"><span>Speed</span><select class="input" id="ratePick">' +
+          [0.8, 1, 1.15, 1.35, 1.6].map(function (r) {
+            return '<option value="' + r + '"' + (r === N.getRate() ? ' selected' : '') + '>' + r + '×</option>';
+          }).join('') +
+        '</select></label>' +
+        '<button class="btn btn--ghost btn--sm" id="voiceTest">Hear it</button>' +
+      '</div>' : '') +
+
       (installPrompt ? '<div class="card card--install">' +
         '<h3>📲 Install on this device</h3>' +
         '<p class="muted">Adds it to your home screen and lets it run full screen, offline, like any other app.</p>' +
@@ -1151,8 +1436,8 @@
       '</div>' : '') +
 
       '<div class="card">' +
-        '<h3>🤖 AI weld scan <span class="pill pill--dim">optional</span></h3>' +
-        '<p class="muted small">Off by default, and the app is complete without it. Turn it on and the Doctor gets a camera button: a model looks at the photo, ticks the symptoms it spots, and the offline Weld Doctor still does the naming and the fix.</p>' +
+        '<h3>📸 Camera scan <span class="pill pill--dim">optional</span></h3>' +
+        '<p class="muted small">Off by default, and the app is complete without it. Turn it on and Old Mate gets a camera button: a model looks at the photo and ticks the symptoms it spots, then Old Mate still does the naming and the fix.</p>' +
         '<label class="field"><span>Provider</span>' +
           '<select class="input" id="visProvider">' +
             [['off', 'Off'], ['hfapi', 'Hugging Face Inference API'], ['space', 'Hosted Space / server'], ['custom', 'Custom endpoint']]
@@ -1179,6 +1464,16 @@
       if (e.target.checked) J.sound('badge');
     });
 
+    var voicePick = $('#voicePick');
+    if (voicePick) {
+      voicePick.addEventListener('change', function (e) { N.setVoiceByName(e.target.value); });
+      $('#ratePick').addEventListener('change', function (e) { N.setRate(parseFloat(e.target.value)); });
+      $('#voiceTest').addEventListener('click', function () {
+        N.setScript([{ textContent: 'Hold the arc about one electrode diameter off the work. Too long and you get spatter, a wandering arc, and porosity.' }]);
+        N.play(0);
+      });
+    }
+
     var installBtn = $('#installBtn');
     if (installBtn) {
       installBtn.addEventListener('click', function () {
@@ -1203,7 +1498,7 @@
           '<label class="field"><span>Access token</span><input class="input" id="visToken" type="password" ' +
             'placeholder="hf_..." value="' + esc(c.token || '') + '"></label>';
         help.innerHTML = 'An image-classification or object-detection model. The free open weld models are coarse ' +
-          '(good weld / bad weld / defect) — good enough to spot and localise, which is all this needs. ' +
+          '(good weld / bad weld / defect) — good enough to spot and localise, which is all Old Mate needs from it. ' +
           'Photos are sent to Hugging Face when you press scan, so it needs signal.';
         return;
       }
@@ -1230,7 +1525,7 @@
         cfg.token = ($('#visToken').value || '').trim();
       }
       V.save(cfg);
-      toast(p === 'off' ? 'AI scan switched off.' : 'Saved. The Doctor now has a camera button.', 'xp');
+      toast(p === 'off' ? 'Camera scan switched off.' : 'Saved. Old Mate has a camera button now.', 'xp');
       J.sound('correct');
     });
 
@@ -1278,11 +1573,17 @@
     P.load();
     shownXp = P.state.xp;
     J.init();
+    MK.load();
+    if (N.supported()) N.loadPrefs();
 
     var newDay = P.touchDay();
     var badges = P.checkBadges();
 
-    window.addEventListener('hashchange', function () { render(); scrollTop(); });
+    window.addEventListener('hashchange', function () {
+      if (N.supported()) N.stop();
+      render();
+      scrollTop();
+    });
 
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();

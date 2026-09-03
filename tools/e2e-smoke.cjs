@@ -30,7 +30,14 @@ function check(name, cond, extra) {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
-  page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+  // The price feeds are unreachable from a file:// sandbox with no network.
+  // The app handles that (cached prices, "no signal" copy), so a failed
+  // resource load is expected here — real script errors are not.
+  page.on('console', m => {
+    if (m.type() !== 'error') return;
+    if (/Failed to load resource|ERR_(CONNECTION|NAME|INTERNET|NETWORK)/.test(m.text())) return;
+    errors.push('console: ' + m.text());
+  });
 
   await page.goto(APP);
 
@@ -38,10 +45,25 @@ function check(name, cond, extra) {
   await page.waitForSelector('#wstart');
   await shot(page, '01-welcome.png');
   await page.fill('#wname', 'Tess');
+  check('onboarding offers learning styles', (await page.locator('.style-opt').count()) === 4);
+  await page.click('[data-style="guts"]');
   await page.click('#wstart');
   await page.waitForSelector('.hero');
   check('onboarding → home', (await page.textContent('.hero-hi')).includes('Tess'));
   check('nine modules on the map', (await page.locator('.node').count()) === 9);
+  check('chosen learning style is saved', await page.evaluate(() => WA_PROGRESS.state.prefMode === 'guts'));
+
+  // --- the menu ---
+  await page.click('#menuBtn');
+  await page.waitForSelector('.drawer-panel');
+  check('menu lists every unit plus the shed tools',
+    (await page.locator('.drawer-item').count()) === 9 + 5 + 2);
+  await shot(page, '16-menu.png');
+  await page.click('.drawer-x');
+  await page.waitForTimeout(320);
+
+  // --- the price ticker ---
+  check('price ticker is on the map', (await page.locator('#ticker').count()) === 1);
   check('header shows level 1', (await page.textContent('.hdr-lvl')) === '1');
 
   /* ---------- daily challenge ---------- */
@@ -55,9 +77,18 @@ function check(name, cond, extra) {
 
   /* ---------- lesson flow ---------- */
   await page.click('.continue');
+  await page.waitForSelector('.modes');
+  check('lesson opens in the style chosen at onboarding', (await page.locator('.gut').count()) >= 3);
+  await page.click('[data-mode="read"]');
   await page.waitForSelector('.prose');
   check('lesson opens with prose + key points', (await page.locator('.keybox li').count()) >= 3);
   check('five learning modes offered', (await page.locator('.mode').count()) === 5);
+  check('read-aloud bar is present', (await page.locator('#reader').count()) === 1);
+  check('narrator built a script from the page',
+    await page.evaluate(() => WA_NARRATOR.status().total > 3));
+  await page.click('#readRate');
+  check('speed control cycles', await page.evaluate(() => WA_NARRATOR.getRate() !== 1));
+  await page.evaluate(() => WA_NARRATOR.setRate(1));
   await shot(page, '03-lesson.png');
 
   // --- the five ways into a lesson ---
@@ -140,6 +171,9 @@ function check(name, cond, extra) {
   /* ---------- weld doctor ---------- */
   await page.goto(APP + '#/doctor');
   await page.waitForSelector('.clue');
+  check('it is Old Mate, not a doctor', (await page.textContent('.mate-head h1')).includes('Old Mate'));
+  check('no "Weld Doctor" left in the UI',
+    !(await page.evaluate(() => document.body.innerText)).match(/weld doctor/i));
   check('all clues rendered', (await page.locator('.clue').count()) === 15);
   await dismiss(page);
   await page.click('#dxBtn');                       // nothing ticked → warn, no results
@@ -151,6 +185,9 @@ function check(name, cond, extra) {
   await page.waitForSelector('.card--dx');
   const topDx = await page.textContent('.card--dx.is-top h3');
   check('porosity ranked top for holes + wind', topDx.includes('Porosity'), { topDx });
+  // innerText returns CSS-uppercased text, so match case-insensitively.
+  check('results are framed as Old Mate\'s call',
+    /what old mate reckons/i.test(await page.evaluate(() => document.body.innerText)));
   check('fix-now steps present', (await page.locator('.dx-sec--fix li').count()) > 0);
   check('Field Medic badge', await page.evaluate(() => WA_PROGRESS.hasBadge('field-medic')));
   await shot(page, '07-doctor.png');
@@ -179,6 +216,15 @@ function check(name, cond, extra) {
   await page.waitForSelector('table');
   check('four cheat sheets render', (await page.locator('.card--sheet').count()) === 4);
   await shot(page, '09-sheets.png');
+
+  await page.goto(APP + '#/kit/scrap');
+  await page.waitForSelector('.price');
+  check('six price cards render', (await page.locator('.price').count()) === 6);
+  check('scrap guide sections render', (await page.locator('.card--scrap').count()) === 6);
+  check('spot-vs-yard warning is shown', (await page.locator('.card--warn').count()) === 1);
+  check('prices degrade gracefully with no network',
+    (await page.textContent('.price-val')).length > 0);
+  await shot(page, '17-scrap.png');
 
   await page.goto(APP + '#/kit/log');
   await page.waitForSelector('#logSave');
@@ -294,6 +340,11 @@ function check(name, cond, extra) {
   check('no horizontal overflow at 1180px', wideOverflow <= 0, { wideOverflow });
 
   check('no page errors', errors.length === 0, errors.slice(0, 5));
+  check('offline price failure is handled, not thrown',
+    await page.evaluate(async () => {
+      const r = await WA_MARKET.refresh({ force: true });
+      return r && typeof r === 'object' && !WA_MARKET.state.loading;
+    }));
 
   await browser.close();
 

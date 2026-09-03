@@ -41,7 +41,7 @@ window.WA_REFERENCE = {
     { id: 'perfect-pass',  icon: '🎯', name: 'Perfect Pass',        desc: 'Score 5 out of 5 on any module quiz.' },
     { id: 'streak-3',      icon: '🔥', name: 'Three Days Running',  desc: 'Show up three days in a row.' },
     { id: 'streak-7',      icon: '🏆', name: 'Week Straight',       desc: 'Show up seven days in a row.' },
-    { id: 'field-medic',   icon: '🩺', name: 'Field Medic',         desc: 'Diagnose a weld with the Weld Doctor.' },
+    { id: 'field-medic',   icon: '👷', name: 'Asked Old Mate',      desc: 'Get Old Mate to look at a weld for you.' },
     { id: 'logbook',       icon: '📓', name: 'Logbook Started',     desc: 'Record your first weld in the log.' },
     { id: 'hands-on',      icon: '🔧', name: 'Hands On',             desc: 'Complete your first bench drill.' },
     { id: 'grafter',       icon: '💪', name: 'Grafter',              desc: 'Complete ten bench drills.' },
@@ -520,6 +520,111 @@ window.WA_REFERENCE = {
         'Fillet throat ≈ leg × 0.7. The throat carries the load.',
         'Over-welding buys distortion and wasted time, not strength. Weld to size and stop.',
         'Bevel angle for a single V is typically 30–35° per edge (60–70° included).'
+      ]
+    }
+  ],
+
+
+  /* --------------------------------------------------------------------- */
+  /* SCRAP & SALVAGE — the trade around the trade                           */
+  /* --------------------------------------------------------------------- */
+  scrapGuide: [
+    {
+      id: 'reality',
+      icon: '💰',
+      title: 'What a yard actually pays',
+      body: [
+        'The prices on the board above are **spot** — what a tonne of refined metal trades for on a world market. That is not what the yard on the edge of town hands you, and anyone who tells you otherwise is selling something.',
+        'A yard has to sort it, store it, cart it and sell it on, so they buy at a discount. As a rough feel: clean bright copper wire might fetch somewhere near two thirds of spot, mixed and dirty grades a good deal less, and steel is priced per tonne in a range that makes it a volume game rather than a payday.',
+        'What that means practically is that **the grade you present is worth more than the weight you present.** The same 20 kg of copper can pay wildly differently depending on whether it is clean bright wire or a tangle of insulated cable with steel fittings still attached.'
+      ],
+      points: [
+        'Spot price is the ceiling, never the offer.',
+        'Sorted and clean beats mixed and dirty, every time.',
+        'Ring two yards before you drive anywhere — prices differ more than you would think.',
+        'Ask what grade they are calling it. If they call your bright wire "mixed", ask why.'
+      ]
+    },
+    {
+      id: 'metals',
+      icon: '🔩',
+      title: 'The metals that actually pay',
+      body: [
+        'Learning to tell these apart by eye is the same skill as unit 8 — and it pays twice, once at the yard and once when you know what you are about to weld.'
+      ],
+      points: [
+        '**Copper** — the best common earner. Bright bare wire is the top grade; then heavier tube and busbar; then insulated cable at a lower rate because they have to strip it.',
+        '**Brass** — yellow and red. Taps, fittings, old valves. Pays well and turns up in every renovation skip.',
+        '**Aluminium** — light and everywhere. Extrusion (window frames, ladders) pays better than cast (engine parts) and much better than cans by the hour it takes to collect them.',
+        '**Lead** — flashing, old sinkers, wheel weights. Heavy for its size, and hazardous — wash your hands, never grind or burn it.',
+        '**Stainless** — 304 and 316 pay several times what mild steel does. A magnet mostly will not stick to either.',
+        '**Electric motors** — copper windings inside a steel case, so they get their own price. Do not bother pulling them apart unless you are quick at it.',
+        '**Catalytic converters** — genuinely valuable (platinum and palladium, see the board above), and precisely because of that they are the most stolen part in the country. Only ever sell one you can account for.',
+        '**Steel** — cheap per kilo, but it is the volume that makes a trailer load worth taking. And offcuts are free practice stock, which is worth more to you right now than the scrap price.'
+      ]
+    },
+    {
+      id: 'sorting',
+      icon: '🧲',
+      title: 'Sorting it like someone who knows',
+      body: [
+        'Five minutes of sorting in your own yard, where you are not being watched and not in a queue, is the difference between a mixed-grade price and a clean-grade price.'
+      ],
+      points: [
+        'Magnet first. Sticks: steel or cast iron. Does not stick: copper, brass, aluminium, lead, stainless — the ones worth money.',
+        'Then weight in the hand. Aluminium is obviously light; lead is startlingly heavy; brass rings when you tap it.',
+        'Colour under a file stroke: copper goes salmon-pink, brass goes yellow, and a plated fitting shows its real metal underneath.',
+        'Keep separate bins from the start. Re-sorting a mixed pile at the yard is how people end up accepting the lower price out of embarrassment.',
+        'Strip insulation only if the time is worth it — work out what the strip rate gains you per hour before you spend an evening on it.',
+        'Remove steel bolts, brackets and fittings from non-ferrous items. That is what turns a "clean" grade into a "dirty" one.'
+      ]
+    },
+    {
+      id: 'danger',
+      icon: '⚠️',
+      title: 'What to never put in the trailer',
+      body: [
+        'This list exists because people have been killed by items on it, and most of them were being careful in every other respect.'
+      ],
+      points: [
+        '**Gas bottles and sealed vessels** — never cut, never grind, never weld. Even "empty" ones hold vapour. Yards will not take them, and cutting one is how people die.',
+        '**Fuel tanks and drums** — same rule. A drum that held fuel is a bomb with a lid.',
+        '**Aerosol cans and pressurised cylinders** — they explode in a baler.',
+        '**Lithium batteries** — a genuine fire risk, and a growing cause of truck and yard fires. Take them to a proper battery drop-off. Lead-acid car batteries most yards do accept, separately.',
+        '**Anything with asbestos** — old shed cladding, old brake shoes, some old flue and pipe lagging. Stop, do not cut, and get advice.',
+        '**Old gauges and instruments** — a small number of industrial ones contain radioactive sources. Rare, but real.',
+        '**Anything you cannot account for.** Copper and cat converter theft is why the paperwork exists.'
+      ]
+    },
+    {
+      id: 'paperwork',
+      icon: '🪪',
+      title: 'The paperwork, and being straight about it',
+      body: [
+        'Scrap is a regulated trade in Australia now, precisely because metal theft got out of hand. Several states — New South Wales under the Scrap Metal Industry Act 2016 among them — **ban cash payment for scrap metal entirely**: you get paid by bank transfer, you show ID, and the yard records the transaction and often photographs the load.',
+        'Rules differ by state, so check your own before you turn up expecting notes. Take a driver\'s licence, expect to give your bank details, and expect questions about anything high-value.',
+        'None of that is aimed at you. It is aimed at the person selling someone else\'s downpipes. Being visibly straight — knowing where your metal came from and saying so — is what gets you treated as a regular rather than a risk.'
+      ],
+      points: [
+        'Bring photo ID, every time.',
+        'Expect EFT rather than cash in several states, including NSW.',
+        'Keep a note of where bigger items came from — a demo job, a farm clean-up, a client.',
+        'Cat converters, air conditioner coils and copper cable draw the most questions. Have your answer ready.'
+      ]
+    },
+    {
+      id: 'welder',
+      icon: '⚡',
+      title: 'Where this meets your welding',
+      body: [
+        'The scrap yard is not a side hustle bolted onto this app. It is the same skill set pointed at a different problem, and it feeds your practice.'
+      ],
+      points: [
+        'Offcut bins are practice stock. Ask — many yards and fabrication shops will let you take mild steel drops for nothing or near it.',
+        'Identifying unknown metal at the yard is the exact drill from unit 8. Magnet, weight, file, spark.',
+        'Never weld a coated, painted or galvanised piece of scrap without grinding it back first — unit 1 covers why.',
+        'Selling your practice coupons afterwards recovers a little of what the steel cost you. Photograph the good ones first.',
+        'And the honest one: recovering gold from electronics at home is chemistry with nasty reagents for a few dollars an hour. The money in metal, for someone with your skills, is in copper, brass, stainless and knowing what you are looking at.'
       ]
     }
   ],

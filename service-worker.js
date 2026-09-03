@@ -2,7 +2,7 @@
    Everything is small and static, so we cache the lot on install and serve
    cache-first. That means the whole app works in a shed with no signal. */
 
-var CACHE = 'weld-academy-v2';
+var CACHE = 'weld-academy-v3';
 
 var FILES = [
   './',
@@ -20,6 +20,8 @@ var FILES = [
   './js/progress.js',
   './js/juice.js',
   './js/vision.js',
+  './js/narrator.js',
+  './js/market.js',
   './js/app.js'
 ];
 
