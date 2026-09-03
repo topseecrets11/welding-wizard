@@ -43,7 +43,12 @@ window.WA_REFERENCE = {
     { id: 'streak-7',      icon: '🏆', name: 'Week Straight',       desc: 'Show up seven days in a row.' },
     { id: 'field-medic',   icon: '🩺', name: 'Field Medic',         desc: 'Diagnose a weld with the Weld Doctor.' },
     { id: 'logbook',       icon: '📓', name: 'Logbook Started',     desc: 'Record your first weld in the log.' },
-    { id: 'ticket-ready',  icon: '🎓', name: 'Ticket Ready',        desc: 'Complete every module in the course.' }
+    { id: 'hands-on',      icon: '🔧', name: 'Hands On',             desc: 'Complete your first bench drill.' },
+    { id: 'grafter',       icon: '💪', name: 'Grafter',              desc: 'Complete ten bench drills.' },
+    { id: 'metal',         icon: '🌡️', name: 'Heat Whisperer',      desc: 'Complete the Metal & Heat mastery unit.' },
+    { id: 'materials',     icon: '🧪', name: 'Alloy Hand',           desc: 'Complete the Beyond Mild Steel mastery unit.' },
+    { id: 'ticket',        icon: '🎓', name: 'Test Ready',           desc: 'Complete the Fit-up & the Ticket mastery unit.' },
+    { id: 'ticket-ready',  icon: '🥇', name: 'The Full Set',         desc: 'Complete every module, core and mastery.' }
   ],
 
   /* --------------------------------------------------------------------- */

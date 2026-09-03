@@ -18,7 +18,9 @@ window.WA_PROGRESS = (function () {
     moduleComplete: 25,
     daily: 20,
     diagnosis: 5,
-    logEntry: 5
+    logEntry: 5,
+    drill: 20,        // bench drills are the real work, so they pay the most
+    recall: 5
   };
 
   var storageOK = true;
@@ -37,7 +39,11 @@ window.WA_PROGRESS = (function () {
       lastLogXpDay: null,
       log: [],                // { id, ts, note, photo, diagnosis }
       checklist: {},          // "sectionId:index" -> true
-      checklistDay: null
+      checklistDay: null,
+      drills: {},             // lessonId -> true  (bench drill completed)
+      recalled: {},           // lessonId -> true  (recall cards worked through)
+      prefMode: 'read',       // her preferred way into a lesson
+      settings: {}            // { vision: {...} } — see js/vision.js
     };
   }
 
@@ -156,6 +162,8 @@ window.WA_PROGRESS = (function () {
     if (state.streak.count >= 7 || state.streak.best >= 7) grant('streak-7');
     if (state.doctorUsed) grant('field-medic');
     if (state.log.length > 0) grant('logbook');
+    if (Object.keys(state.drills).length > 0) grant('hands-on');
+    if (Object.keys(state.drills).length >= 10) grant('grafter');
 
     if (earned.length) save();
     return earned;
@@ -394,6 +402,69 @@ window.WA_PROGRESS = (function () {
     save();
   }
 
+  /* --------------------------------------------------------------- drills */
+
+  function isDrillDone(lessonId) { return !!state.drills[lessonId]; }
+
+  function completeDrill(lessonId) {
+    var before = level();
+    var gained = 0;
+    if (!state.drills[lessonId]) {
+      state.drills[lessonId] = true;
+      state.xp += XP.drill;
+      gained = XP.drill;
+      save();
+    }
+    return { xp: gained, newBadges: checkBadges(), levelUp: level() > before };
+  }
+
+  function drillsDone(moduleId) {
+    var m = moduleById(moduleId);
+    if (!m) return 0;
+    return m.lessons.filter(function (l) { return state.drills[l.id]; }).length;
+  }
+
+  function drillCount() { return Object.keys(state.drills).length; }
+
+  function isRecallDone(lessonId) { return !!state.recalled[lessonId]; }
+
+  function completeRecall(lessonId) {
+    var before = level();
+    var gained = 0;
+    if (!state.recalled[lessonId]) {
+      state.recalled[lessonId] = true;
+      state.xp += XP.recall;
+      gained = XP.recall;
+      save();
+    }
+    return { xp: gained, newBadges: checkBadges(), levelUp: level() > before };
+  }
+
+  /* Proficiency: knowing it is only half. This counts hands-on work too, so a
+     module only reads 100% when the lessons are read, the quiz is passed AND
+     the bench drills are actually done. */
+  function proficiency(moduleId) {
+    var m = moduleById(moduleId);
+    if (!m) return 0;
+    var n = m.lessons.length;
+    var read = lessonsDone(moduleId) / n;
+    var drilled = drillsDone(moduleId) / n;
+    var q = state.quizzes[moduleId];
+    var quizScore = q && q.total ? q.best / q.total : 0;
+    return Math.round((read * 0.3 + quizScore * 0.3 + drilled * 0.4) * 100);
+  }
+
+  /* ------------------------------------------------------------- settings */
+
+  function setPrefMode(mode) { state.prefMode = mode; save(); }
+
+  function settings() { return state.settings || (state.settings = {}); }
+
+  function setSetting(key, value) {
+    settings()[key] = value;
+    save();
+  }
+
   /* ---------------------------------------------------------------- admin */
 
   function setName(n) { state.name = n; save(); }
@@ -438,6 +509,17 @@ window.WA_PROGRESS = (function () {
     markDoctorUsed: markDoctorUsed,
     addLogEntry: addLogEntry,
     deleteLogEntry: deleteLogEntry,
+
+    isDrillDone: isDrillDone,
+    completeDrill: completeDrill,
+    drillsDone: drillsDone,
+    drillCount: drillCount,
+    isRecallDone: isRecallDone,
+    completeRecall: completeRecall,
+    proficiency: proficiency,
+    setPrefMode: setPrefMode,
+    settings: settings,
+    setSetting: setSetting,
 
     checklistState: checklistState,
     toggleChecklist: toggleChecklist,

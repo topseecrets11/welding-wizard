@@ -10,13 +10,17 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 
 const sandbox = { window: {} };
-for (const file of ['js/content.js', 'js/reference.js']) {
+for (const file of ['js/content.js', 'js/reference.js', 'js/diagrams.js',
+                    'js/practice.js', 'js/content-mastery.js']) {
   const src = readFileSync(join(root, file), 'utf8');
   new Function('window', src)(sandbox.window);
 }
 
 const C = sandbox.window.WA_CONTENT;
 const R = sandbox.window.WA_REFERENCE;
+const PR = sandbox.window.WA_PRACTICE;
+const DG = sandbox.window.WA_DIAGRAMS;
+const DMAP = sandbox.window.WA_DIAGRAM_MAP;
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -52,6 +56,24 @@ for (const m of C.modules ?? []) {
     for (const p of l.body ?? []) {
       const stars = (p.match(/\*\*/g) ?? []).length;
       if (stars % 2 !== 0) fail(`${lw} has unbalanced ** bold markers`);
+    }
+  }
+
+  // Every lesson needs a bench drill and recall cards — the Do and Recall
+  // modes must never render an empty screen.
+  for (const l of m.lessons ?? []) {
+    const entry = PR[l.id];
+    if (!entry) { fail(`${where} lesson "${l.id}" has no practice entry`); continue; }
+    const p = entry.practice;
+    if (!p) fail(`lesson "${l.id}" has no bench drill`);
+    else {
+      if (!p.task || !p.why) fail(`drill for "${l.id}" is missing task or why`);
+      if (!Array.isArray(p.steps) || p.steps.length < 3) fail(`drill for "${l.id}" needs at least 3 steps`);
+      if (!Array.isArray(p.pass) || p.pass.length < 2) fail(`drill for "${l.id}" needs at least 2 pass criteria`);
+    }
+    if (!Array.isArray(entry.recall) || entry.recall.length < 2) fail(`lesson "${l.id}" needs at least 2 recall cards`);
+    for (const c of entry.recall ?? []) {
+      if (!c.q || !c.a) fail(`a recall card for "${l.id}" is missing q or a`);
     }
   }
 
@@ -103,6 +125,25 @@ for (const id of clueIds) {
   if (!used) fail(`Clue "${id}" is not matched by any defect`);
 }
 
+/* ---- diagrams: every mapped id must exist ---- */
+
+for (const [lessonId, ids] of Object.entries(DMAP ?? {})) {
+  for (const id of ids) {
+    if (!DG.has(id)) fail(`Diagram map points lesson "${lessonId}" at unknown diagram "${id}"`);
+  }
+}
+
+for (const id of DG.ids) {
+  const used = Object.values(DMAP ?? {}).some((ids) => ids.includes(id));
+  if (!used) fail(`Diagram "${id}" is drawn but never shown in any lesson`);
+}
+
+/* ---- practice entries must all belong to real lessons ---- */
+
+for (const id of Object.keys(PR)) {
+  if (!lessonIds.has(id)) fail(`Practice entry "${id}" does not match any lesson`);
+}
+
 /* ---- badges: every module badge must correspond to a real module ---- */
 
 const badgeIds = new Set();
@@ -144,4 +185,5 @@ if (errors.length) {
 
 console.log('✓ Content valid');
 console.log(`  ${C.modules.length} modules · ${lessonCount} lessons · ${quizCount} quiz questions`);
+console.log(`  ${Object.keys(PR).length} bench drills · ${Object.values(PR).reduce((n, e) => n + e.recall.length, 0)} recall cards · ${DG.ids.length} diagrams`);
 console.log(`  ${R.clues.length} clues · ${R.defects.length} defects · ${R.badges.length} badges · ${R.cheatsheets.length} cheat sheets`);
