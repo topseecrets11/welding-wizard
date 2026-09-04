@@ -433,14 +433,25 @@
       }).join('');
   }
 
+  /* Prices can take seconds to land on a bad connection, and by then she may
+     have moved on to another tab. Re-rendering blind would wipe the screen she
+     is actually using — including anything she had typed into the weld log. */
+  function stillOnScrap() {
+    return location.hash.replace(/^#\/?/, '') === 'kit/scrap';
+  }
+
   function wireScrap() {
-    afterPaint(function () { MK.refresh().then(function () { renderKit('scrap'); }); });
+    afterPaint(function () {
+      MK.refresh().then(function () { if (stillOnScrap()) renderKit('scrap'); });
+    });
     var btn = $('#priceRefresh');
     if (btn) {
       btn.addEventListener('click', function () {
         tap();
         btn.textContent = 'Checking…';
-        MK.refresh({ force: true }).then(function () { renderKit('scrap'); });
+        MK.refresh({ force: true }).then(function () {
+          if (stillOnScrap()) renderKit('scrap');
+        });
       });
     }
   }

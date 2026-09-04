@@ -226,6 +226,21 @@ function check(name, cond, extra) {
     (await page.textContent('.price-val')).length > 0);
   await shot(page, '17-scrap.png');
 
+  // A slow price fetch that lands after she has already moved to another tab
+  // must not re-render the scrap page over the top of what she is doing. This
+  // reproduces a real failure: prices resolved mid-typing on the weld log and
+  // detached the form, losing the entry.
+  await page.goto(APP + '#/kit/scrap');
+  await page.waitForSelector('.price');
+  await page.goto(APP + '#/kit/log');
+  await page.waitForSelector('#logSave');
+  await page.fill('#logNote', 'Late price fetch must not wipe this.');
+  await page.evaluate(() => WA_MARKET.refresh({ force: true }));
+  await page.waitForTimeout(600);
+  check('late price fetch does not clobber another tab',
+    (await page.locator('#logSave').count()) === 1 &&
+    (await page.inputValue('#logNote')) === 'Late price fetch must not wipe this.');
+
   await page.goto(APP + '#/kit/log');
   await page.waitForSelector('#logSave');
   await page.fill('#logNote', 'First fillet on 3 mm, MIG 18 V / 5 m/min. Undercut on the top edge.');
