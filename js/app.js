@@ -26,6 +26,7 @@
   var N = window.WA_NARRATOR;
   var MK = window.WA_MARKET;
   var PF = window.WA_PROFILE;
+  var DR = window.WA_DRIVE;
 
   var view, header, tabbar, toastHost;
   var autoReadTimer = null;        // pending auto-start of the reader
@@ -487,6 +488,12 @@
       '</div>' +
       // Money first if that is her reason for opening it at all.
       (lead === 'money' ? tickerHtml + continueCard : continueCard + tickerHtml) +
+      (DR.supported() ? '<a class="drive-cta" href="#/drive">' +
+          '<span class="drive-cta-i">🚗</span>' +
+          '<span class="drive-cta-t"><b>Drive Mode</b>' +
+            '<i>A whole unit read out loud. Turn the drive into study.</i></span>' +
+          '<span class="drive-cta-go">→</span>' +
+        '</a>' : '') +
       dailyCardHtml() +
       (lead === 'badges' ? badgesHtmlBlock : '') +
       '<h2 class="section-h">The road to a ticket</h2>' +
@@ -1633,6 +1640,109 @@
     });
   }
 
+  /* ============================ drive mode ==============================
+   * Big, glanceable, three controls. Nothing on this screen needs reading at
+   * 100 km/h — the point is that she does not look at it at all.
+   * ====================================================================== */
+
+  function driveUnitPicker() {
+    var last = DR.saved();
+    var lastMod = last && moduleById(last.module);
+    return '<a class="back" href="#/home">‹ Back</a>' +
+      '<h1 class="page-h">🚗 Drive Mode</h1>' +
+      '<p class="page-sub">A whole unit read out end to end, like a podcast. ' +
+      'Plug into the stereo, put the phone down, and the drive counts as study. ' +
+      'The wheel buttons work: skip is the next lesson.</p>' +
+      (lastMod ? '<a class="continue" href="#/drive/' + lastMod.id + '">' +
+          '<div class="continue-shine"></div>' +
+          '<div class="continue-kicker">Pick up where you stopped</div>' +
+          '<div class="continue-title">' + esc(lastMod.title) + '</div>' +
+          '<div class="continue-foot"><span>' + lastMod.icon + ' Part way through</span>' +
+            '<span class="continue-go">Resume →</span></div>' +
+        '</a>' : '') +
+      '<h2 class="section-h">Pick a unit</h2>' +
+      tiles(C.modules.filter(function (m) { return P.moduleUnlocked(m.id); }).map(function (m) {
+        var mins = Math.max(1, Math.round(WA_SCRIPT.seconds(WA_SCRIPT.unit(m)) / 60));
+        return { key: 'drive:' + m.id, icon: m.icon, title: m.title,
+                 sub: m.lessons.length + ' lessons · about ' + mins + ' min' };
+      })) +
+      '<div class="card card--warn">' +
+        '<b>Before you set off</b>' +
+        '<p>Start it while you are parked, then leave it alone. Speech with the screen off is ' +
+        'unreliable on some Android versions — the app holds the screen awake to work around it, ' +
+        'so plug the phone in. And it is talk, not a test: nothing here needs you to look.</p>' +
+      '</div>';
+  }
+
+  function renderDrive(moduleId) {
+    renderTabs('');
+    if (!DR.supported()) {
+      view.innerHTML = '<a class="back" href="#/home">‹ Back</a>' +
+        '<h1 class="page-h">🚗 Drive Mode</h1>' +
+        '<div class="card"><p>This phone\'s browser cannot read out loud, so Drive Mode has ' +
+        'nothing to play. Everything else still works.</p></div>';
+      return;
+    }
+    if (!moduleId) { view.innerHTML = driveUnitPicker(); wireDriveTiles(); return; }
+
+    var m = moduleById(moduleId);
+    if (!m) return go('#/drive');
+
+    DR.build(m);
+    var last = DR.saved();
+    if (last && last.module === m.id) DR.resumeAt(last.at);
+
+    // Listening all the way through a lesson counts like reading it.
+    DR.setCreditHandler(function (res) { announce(res); });
+
+    view.innerHTML =
+      '<div class="drive">' +
+        '<a class="back" href="#/drive">‹ Units</a>' +
+        '<div class="drive-unit" id="drUnit"></div>' +
+        '<div class="drive-lesson" id="drLesson"></div>' +
+        '<div class="drive-track"><span id="drBar"></span></div>' +
+        '<div class="drive-times" id="drTimes"></div>' +
+        '<div class="drive-controls">' +
+          '<button class="drive-btn" id="drPrev" aria-label="Previous lesson">⏮</button>' +
+          '<button class="drive-btn drive-btn--go" id="drPlay" aria-label="Play or pause">▶</button>' +
+          '<button class="drive-btn" id="drNext" aria-label="Next lesson">⏭</button>' +
+        '</div>' +
+        '<div class="drive-now" id="drNow"></div>' +
+        '<p class="drive-fine">Keep the phone plugged in. Skip on the wheel jumps a lesson.</p>' +
+      '</div>';
+
+    function paint(p) {
+      var unit = $('#drUnit');
+      if (!unit) { DR.offChange(paint); return; }      // she has navigated away
+      unit.textContent = p.unit;
+      // The unit intro plays before lesson one, so it has no lesson number.
+      $('#drLesson').textContent = p.lessonNumber
+        ? 'Lesson ' + p.lessonNumber + ' of ' + p.lessonCount + ' · ' + p.lessonTitle
+        : 'Starting up…';
+      $('#drBar').style.width = p.percent + '%';
+      $('#drTimes').textContent = p.intoLesson + ' in · ' + p.lessonLeft +
+        ' left in this one · ' + p.unitLeft + ' left in the unit';
+      $('#drPlay').textContent = p.playing ? '❚❚' : '▶';
+      $('#drNow').textContent = p.line;
+      $('#drNow').classList.toggle('is-live', p.playing);
+    }
+
+    DR.onChange(paint);
+    paint(DR.position());
+
+    $('#drPlay').addEventListener('click', function () { tap(); DR.toggle(); });
+    $('#drNext').addEventListener('click', function () { tap(); DR.nextLesson(); });
+    $('#drPrev').addEventListener('click', function () { tap(); DR.prevLesson(); });
+  }
+
+  function wireDriveTiles() {
+    view.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-tile^="drive:"]');
+      if (!btn) return;
+      go('#/drive/' + btn.getAttribute('data-tile').split(':')[1]);
+    });
+  }
+
   /* ============================ settings ================================ */
 
   function renderSettings() {
@@ -1860,6 +1970,7 @@
       case 'doctor':   renderDoctor(); break;
       case 'kit':      renderKit(parts[1]); break;
       case 'settings': renderSettings(); break;
+      case 'drive':    renderDrive(parts[1]); break;
       default:         renderHome();
     }
   }

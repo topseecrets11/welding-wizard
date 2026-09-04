@@ -331,6 +331,103 @@ function check(name, cond, extra) {
   check('Logbook badge', await page.evaluate(() => WA_PROGRESS.hasBadge('logbook')));
   await shot(page, '10-log.png');
 
+  /* ---------- drive mode ---------- */
+  await page.goto(APP + '#/drive');
+  await page.waitForSelector('.tile-btn[data-tile^="drive:"]');
+  await dismiss(page);
+  check('drive mode offers the unlocked units',
+    (await page.locator('.tile-btn[data-tile^="drive:"]').count()) >= 1);
+  check('each unit shows how long it runs',
+    /about \d+ min/.test(await page.textContent('.tile-btn[data-tile^="drive:"] .tile-s')));
+
+  await page.goto(APP + '#/drive/safety');
+  await page.waitForSelector('.drive-controls');
+  await dismiss(page);
+  check('drive mode builds a whole-unit playlist',
+    await page.evaluate(() => WA_DRIVE.lineCount() > 20));
+  check('the playlist is marked up lesson by lesson',
+    await page.evaluate(() => WA_DRIVE.lessonMarks().length ===
+      WA_CONTENT.modules.find(m => m.id === 'safety').lessons.length));
+  // The unit intro plays before lesson one, so it belongs to no lesson.
+  check('the unit is topped and tailed', await page.evaluate(() =>
+    WA_DRIVE.position().lessonNumber === 0 && /Unit /.test(WA_DRIVE.position().line)));
+  check('the screen says something during the intro',
+    (await page.textContent('#drLesson')).trim().length > 0);
+
+  await page.evaluate(() => WA_DRIVE.seek(WA_DRIVE.lessonMarks()[0].index));
+  check('it says where she is, podcast style', await page.evaluate(() => {
+    const p = WA_DRIVE.position();
+    return /^\d+:\d\d$/.test(p.intoLesson) && /^\d+:\d\d$/.test(p.unitLeft) &&
+      p.lessonNumber === 1 && p.lessonCount > 1;
+  }));
+  check('the timestamp is on screen', /in ·.*left in the unit/.test(await page.textContent('#drTimes')));
+
+  // Skip should move a whole lesson, the way a podcast app does — that is what
+  // the steering wheel button will be wired to.
+  await page.click('#drNext');
+  check('next jumps a whole lesson, not a sentence',
+    await page.evaluate(() => WA_DRIVE.position().lessonNumber === 2));
+  await page.click('#drPrev');
+  check('previous goes back a lesson',
+    await page.evaluate(() => WA_DRIVE.position().lessonNumber === 1));
+
+  check('media session handlers are registered', await page.evaluate(() => {
+    // Playback is not started here (no audio device in headless), so register
+    // the session directly and confirm the wiring rather than the sound.
+    if (!navigator.mediaSession) return true;      // unsupported: nothing to assert
+    let seen = [];
+    const orig = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
+    navigator.mediaSession.setActionHandler = (k, fn) => { if (fn) seen.push(k); return orig(k, fn); };
+    WA_DRIVE.seek(0);
+    navigator.mediaSession.setActionHandler = orig;
+    return ['play', 'pause', 'nexttrack', 'previoustrack'].every(k => seen.includes(k));
+  }));
+
+  check('where she got to is written down as it goes', await page.evaluate(() => {
+    WA_DRIVE.seek(6);
+    const s = WA_PROGRESS.settings().drive;
+    return s && s.module === 'safety' && s.at === 6;
+  }));
+  check('a resumed unit picks up where it stopped', await page.evaluate(async () => {
+    location.hash = '#/drive/safety';
+    await new Promise(r => setTimeout(r, 260));
+    return WA_DRIVE.position().index === 6;
+  }));
+  await page.goto(APP + '#/drive/safety');
+  await page.waitForSelector('.drive-controls');
+  await dismiss(page);
+  await shot(page, '19-drive.png');
+
+  /* Playing a unit end to end is the whole point, so it is tested end to end.
+     Speech is stubbed to complete instantly — there is no audio device in
+     headless Chromium — but everything else is the real code path. */
+  const drive = await page.evaluate(async () => {
+    ['safety-1', 'safety-2', 'safety-3', 'safety-4'].forEach(id => {
+      delete WA_PROGRESS.state.lessons[id];
+    });
+    WA_PROGRESS.save ? WA_PROGRESS.save() : null;
+    const spoken = [];
+    window.speechSynthesis.speak = (u) => { spoken.push(u.text); setTimeout(() => u.onend && u.onend(), 3); };
+    window.speechSynthesis.cancel = () => {};
+    WA_DRIVE.seek(0);
+    WA_DRIVE.play();
+    await new Promise(r => setTimeout(r, 3000));
+    const mod = WA_CONTENT.modules.find(m => m.id === 'safety');
+    return {
+      spoken: spoken.length,
+      reachedEnd: WA_DRIVE.position().index >= WA_DRIVE.lineCount() - 1,
+      stillPlaying: WA_DRIVE.isPlaying(),
+      credited: mod.lessons.filter(l => WA_PROGRESS.isLessonDone(l.id)).length,
+      lessons: mod.lessons.length,
+      resumeCleared: !WA_PROGRESS.settings().drive
+    };
+  });
+  check('a unit plays lesson into lesson without a tap', drive.spoken > 50, drive);
+  check('it reaches the end and stops', drive.reachedEnd && !drive.stillPlaying, drive);
+  check('every lesson listened to is credited, including the last',
+    drive.credited === drive.lessons, drive);
+  check('finishing clears the resume point', drive.resumeCleared, drive);
+
   /* ---------- settings, sound + AI plumbing ---------- */
   await page.goto(APP + '#/settings');
   await page.waitForSelector('.switch-track');
