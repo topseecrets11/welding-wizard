@@ -1,0 +1,44 @@
+name: Weld Academy
+
+# The app has no build step and no dependencies — these checks just prove the
+# content is structurally sound and the app still works in a real browser.
+on:
+  push:
+    paths:
+      - 'weld-academy/**'
+      - '.github/workflows/weld-academy.yml'
+  pull_request:
+    paths:
+      - 'weld-academy/**'
+      - '.github/workflows/weld-academy.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: weld-academy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Structural invariants: every lesson has a drill and recall cards, every
+      # quiz answer index is in range, every diagram referenced exists, etc.
+      - name: Validate content
+        run: node tools/validate-content.mjs
+
+      # Playwright is the only dev dependency and it is not vendored, so it is
+      # installed here rather than committed to the repo.
+      - name: Install Playwright
+        run: npm install --no-save playwright@1.56.1
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end smoke test
+        run: node tools/e2e-smoke.cjs
