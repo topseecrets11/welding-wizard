@@ -1,0 +1,23 @@
+{
+  "name": "Weld Academy",
+  "short_name": "Weld",
+  "description": "Learn stick, MIG and TIG properly — lessons, bench drills and a weld doctor for the shed.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#101216",
+  "theme_color": "#101216",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Weld Doctor", "short_name": "Doctor", "url": "./index.html#/doctor" },
+    { "name": "Cheat sheets", "short_name": "Sheets", "url": "./index.html#/kit/sheets" },
+    { "name": "Weld log", "short_name": "Log", "url": "./index.html#/kit/log" }
+  ]
+}
