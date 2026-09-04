@@ -167,24 +167,52 @@ window.WA_PROFILE = (function () {
     r.style.setProperty('--accent-tint', t.tint);
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', '#101216');
+    // Sparks cache their colours, so tell them to re-read.
+    if (window.WA_JUICE && window.WA_JUICE.refreshTheme) window.WA_JUICE.refreshTheme();
   }
 
-  /* Old Mate's line for the moment, in the tone she asked for. */
+  /* Old Mate's line for the moment, in the tone she asked for.
+   *
+   * The "warm" tone is respect for the work, not cheerleading. Praise attaches
+   * to effort and to turning up — never to being clever, and never to being
+   * a good girl about it. She gets talked to like someone who grafts, because
+   * she is one. Nothing in here should sound like a sticker on a chart. */
   var LINES = {
     right: {
       blunt: ['Right.', 'Correct.', 'That is the one.'],
-      warm:  ['Good on you.', 'That is it exactly.', 'See? You knew that.'],
+      warm:  ['That is it.', 'Yep — that is the one.', 'You had that.'],
       quiet: ['Correct.', 'Yes.', 'That is right.']
     },
     wrong: {
       blunt: ['No. Read it again.', 'Wrong. Here is why.', 'Not that one.'],
-      warm:  ['Close, but not quite.', 'Not this time — have a look at why.', 'Nearly. This is the bit to remember.'],
+      warm:  ['Not that one — here is why.', 'Close. This is the bit that matters.', 'No, but you can see why you would think it.'],
       quiet: ['Not quite.', 'No.', 'Incorrect.']
     },
     welcome: {
       blunt: ['Back again. Good.', 'Right, where were we.'],
-      warm:  ['Good to see you back.', 'There she is.'],
+      warm:  ['Back at it.', 'Right then.', 'There you are.'],
       quiet: ['Welcome back.', 'Carry on.']
+    },
+    /* Finishing a lesson. Credit the graft, not the cleverness. */
+    lesson: {
+      blunt: ['Done. Next.', 'That is one down.', 'Good. Keep going.'],
+      warm:  ['That is another one banked.', 'Chipping away at it. That is how it goes in.',
+              'You turned up and did it. That is the whole trick.'],
+      quiet: ['Lesson complete.', 'Done.', 'That one is finished.']
+    },
+    /* Finishing a whole unit — the bigger moment. */
+    unit: {
+      blunt: ['Unit done. That is real now.', 'Whole unit. Good.'],
+      warm:  ['A whole unit finished. Most people talk about it — you did it.',
+              'That is a unit down. You know something now that you did not last week.',
+              'Whole unit, done in your own time, around everything else. That counts.'],
+      quiet: ['Unit complete.', 'That is the unit finished.']
+    },
+    /* Coming back on consecutive days. */
+    streak: {
+      blunt: ['Again today. Good.', 'Back two days running.'],
+      warm:  ['Two nights running — that is how it is done.', 'You keep turning up. That is the bit that works.'],
+      quiet: ['Streak going.', 'Another day.']
     }
   };
 

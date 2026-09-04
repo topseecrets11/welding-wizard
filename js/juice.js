@@ -51,7 +51,23 @@ window.WA_JUICE = (function () {
 
   /* ------------------------------------------------------------ sparks */
 
-  var SPARK_COLOURS = ['#ffd27a', '#ff9f1c', '#fff3d6', '#ffb54a', '#ffffff'];
+  /* Sparks are read from the theme tokens rather than fixed, so they match
+     whatever colours she picked in her profile. Re-read on demand and cached,
+     because getComputedStyle in the particle loop would be wasteful. */
+  var SPARK_FALLBACK = ['#ffd27a', '#ff9f1c', '#fff3d6', '#ffb54a', '#ffffff'];
+  var sparkCache = null;
+
+  function sparkColours() {
+    if (sparkCache) return sparkCache;
+    var cs = getComputedStyle(document.documentElement);
+    var a = (cs.getPropertyValue('--accent') || '').trim();
+    var b = (cs.getPropertyValue('--accent-2') || '').trim();
+    sparkCache = (a && b) ? [b, a, '#ffffff', b, a] : SPARK_FALLBACK;
+    return sparkCache;
+  }
+
+  /* Called when her theme changes so the next burst uses the new colours. */
+  function refreshTheme() { sparkCache = null; }
 
   function burst(x, y, count, power) {
     if (reduced) return;
@@ -67,7 +83,7 @@ window.WA_JUICE = (function () {
         life: 1,
         decay: 0.008 + Math.random() * 0.016,
         size: 1 + Math.random() * 2.4,
-        colour: SPARK_COLOURS[(Math.random() * SPARK_COLOURS.length) | 0],
+        colour: sparkColours()[(Math.random() * 5) | 0],
         spin: (Math.random() - 0.5) * 0.3
       });
     }
@@ -87,7 +103,7 @@ window.WA_JUICE = (function () {
         life: 1,
         decay: 0.004 + Math.random() * 0.006,
         size: 1 + Math.random() * 2.6,
-        colour: SPARK_COLOURS[(Math.random() * SPARK_COLOURS.length) | 0],
+        colour: sparkColours()[(Math.random() * 5) | 0],
         spin: 0
       });
     }
@@ -282,6 +298,7 @@ window.WA_JUICE = (function () {
     haptic: haptic,
     countUp: countUp,
     celebrate: celebrate,
+    refreshTheme: refreshTheme,
     reducedMotion: function () { return reduced; }
   };
 })();

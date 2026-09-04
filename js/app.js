@@ -25,8 +25,10 @@
   var V = window.WA_VISION;
   var N = window.WA_NARRATOR;
   var MK = window.WA_MARKET;
+  var PF = window.WA_PROFILE;
 
   var view, header, tabbar, toastHost;
+  var autoReadTimer = null;        // pending auto-start of the reader
   var shownXp = 0;                 // what the header is currently displaying
   var installPrompt = null;        // Android "add to home screen" event
 
@@ -236,68 +238,110 @@
 
   /* ============================ onboarding ============================== */
 
+  /* Onboarding is one screen at a time: the pitch and her name, then the eight
+     questions as one-tap cards. Answering advances automatically — nothing to
+     scroll, nothing to submit, no way to be halfway through a form. */
   function renderWelcome() {
     tabbar.classList.add('hidden');
     header.classList.add('hidden');
-    view.innerHTML =
-      '<div class="welcome">' +
-        '<div class="welcome-arc">⚡</div>' +
-        '<h1>Weld Academy</h1>' +
-        '<p class="welcome-sub">Stick, MIG and TIG — taught properly, drilled at the bench, and a shed companion for when it goes wrong.</p>' +
-        '<div class="welcome-points">' +
-          '<div><span>📚</span><b>Nine modules, 39 lessons.</b> The same knowledge a trade course teaches. Metric, Australian standards.</div>' +
-          '<div><span>🔧</span><b>Bench drills.</b> Every lesson has a job to go and do, with pass marks you can judge yourself against.</div>' +
-          '<div><span>🩺</span><b>Weld Doctor.</b> Something wrong? Tick what you see — it names it, and tells you how to fix it. Works with no signal.</div>' +
-          '<div><span>🎯</span><b>Five ways in.</b> Read it, skim it, see it, do it, or get tested on it. Whatever makes it stick for you.</div>' +
-        '</div>' +
-        '<label class="welcome-label" for="wname">What should I call you?</label>' +
-        '<input id="wname" class="input" type="text" placeholder="Your name" maxlength="24" autocomplete="off">' +
-        '<label class="welcome-label">How do you like to take things in?</label>' +
-        '<div class="style-pick" id="stylePick">' +
-          [['read', '📖', 'Read it', 'Give me the whole thing'],
-           ['guts', '⚡', 'Just the guts', 'Bullet points, no waffle'],
-           ['show', '👁️', 'Show me', 'Pictures first'],
-           ['do', '🔧', 'Let me do it', 'Straight to the bench']
-          ].map(function (o, i) {
-            return '<button class="style-opt' + (i === 0 ? ' is-on' : '') + '" data-style="' + o[0] + '">' +
-              '<span class="style-i">' + o[1] + '</span>' +
-              '<span class="style-t"><b>' + o[2] + '</b><i>' + o[3] + '</i></span></button>';
-          }).join('') +
-        '</div>' +
-        '<p class="welcome-fine">Every lesson has all five — this just picks which one opens first. Switch any time.</p>' +
-        '<button class="btn btn--primary btn--big" id="wstart">Strike an arc →</button>' +
-        '<p class="welcome-fine">Everything stays on this device. No account, no internet needed.</p>' +
-      '</div>';
+    var answers = {};
+    var QS = PF.QUESTIONS;
+    // A retake keeps her name and goes straight to the questions.
+    var retake = !!P.state.name;
+    var step = retake ? 1 : 0;          // 0 = the pitch, 1..8 = the questions
+    var pending = P.state.name || '';
 
-    var input = $('#wname');
-    var chosenStyle = 'read';
+    function paintIntro() {
+      view.innerHTML =
+        '<div class="welcome">' +
+          '<div class="welcome-arc">⚡</div>' +
+          '<h1>Weld Academy</h1>' +
+          '<p class="welcome-sub">Stick, MIG and TIG — taught properly, drilled at the bench, and a shed companion for when it goes wrong.</p>' +
+          '<div class="welcome-points">' +
+            '<div><span>📚</span><b>Nine modules, 39 lessons.</b> The same knowledge a trade course teaches. Metric, Australian standards.</div>' +
+            '<div><span>🔧</span><b>Bench drills.</b> Every lesson has a job to go and do, with pass marks you can judge yourself against.</div>' +
+            '<div><span>👷</span><b>Old Mate.</b> Something wrong? Tick what you see — he names it, and tells you how to fix it. Works with no signal.</div>' +
+            '<div><span>🎧</span><b>Listen in the ute.</b> Whole units read out loud, podcast style, so the driving counts as study.</div>' +
+          '</div>' +
+          '<label class="welcome-label" for="wname">What should I call you?</label>' +
+          '<input id="wname" class="input" type="text" placeholder="Your name" maxlength="24" autocomplete="off">' +
+          '<button class="btn btn--primary btn--big" id="wstart">Start →</button>' +
+          '<p class="welcome-fine">Eight quick questions next, so this teaches you the way you actually learn. Two minutes, then you are in.</p>' +
+          '<p class="welcome-fine">Everything stays on this device. No account, no internet needed.</p>' +
+        '</div>';
 
-    $('#stylePick').addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-style]');
-      if (!btn) return;
-      chosenStyle = btn.getAttribute('data-style');
-      $('#stylePick').querySelectorAll('.style-opt').forEach(function (b) {
-        b.classList.toggle('is-on', b === btn);
+      var input = $('#wname');
+      function next() {
+        pending = (input.value || '').trim() || 'Welder';
+        step = 1;
+        J.sound('tap');
+        paintQuestion();
+      }
+      $('#wstart').addEventListener('click', next);
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') next(); });
+      input.focus();
+    }
+
+    function paintQuestion() {
+      var q = QS[step - 1];
+      view.innerHTML =
+        '<div class="welcome welcome--q">' +
+          '<div class="q-progress"><i style="width:' + Math.round((step / QS.length) * 100) + '%"></i></div>' +
+          '<p class="q-count">Question ' + step + ' of ' + QS.length + '</p>' +
+          '<h2 class="q-ask">' + esc(q.q) + '</h2>' +
+          '<div class="q-opts" id="qOpts">' +
+            q.opts.map(function (o) {
+              return '<button class="q-opt" data-v="' + esc(o.v) + '">' +
+                  '<b>' + esc(o.label) + '</b><i>' + esc(o.sub) + '</i>' +
+                '</button>';
+            }).join('') +
+          '</div>' +
+          (step > 1 ? '<button class="btn btn--ghost btn--sm" id="qBack">← Back</button>' : '') +
+        '</div>';
+
+      $('#qOpts').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-v]');
+        if (!btn) return;
+        answers[q.id] = btn.getAttribute('data-v');
+        btn.classList.add('is-on');
+        J.sound('tap');
+        J.haptic('tap');
+        // Let the press register visually before the screen changes.
+        setTimeout(function () {
+          if (step < QS.length) { step++; paintQuestion(); }
+          else finish(btn);
+        }, 160);
       });
-      J.sound('tap');
-    });
 
-    function start() {
-      P.setName((input.value || '').trim() || 'Welder');
-      P.setPrefMode(chosenStyle);
+      var back = $('#qBack');
+      if (back) back.addEventListener('click', function () { step--; paintQuestion(); });
+    }
+
+    function finish(fromEl) {
+      P.setName(pending);
+      var d = PF.save(answers);          // stores answers, repaints the theme
+      P.setPrefMode(d.defaultMode);      // her answers pick the opening mode
       header.classList.remove('hidden');
       tabbar.classList.remove('hidden');
       J.sound('level');
-      J.burstFrom($('#wstart'), 40, 1.3);
+      if (fromEl) J.burstFrom(fromEl, 40, 1.3);
       go('#/home');
       render();
     }
-    $('#wstart').addEventListener('click', start);
-    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') start(); });
-    input.focus();
+
+    if (retake) paintQuestion(); else paintIntro();
   }
 
   /* ============================ home / map ============================== */
+
+  /* Plain and time-aware, using her name — not a slogan. */
+  function greeting() {
+    var h = new Date().getHours();
+    if (h < 12) return 'Morning';
+    if (h < 17) return 'Afternoon';
+    if (h < 21) return 'Evening';
+    return 'Late one';
+  }
 
   function renderHome() {
     renderTabs('home');
@@ -327,6 +371,24 @@
         '</div>';
     }
 
+    /* She told us what keeps her coming back, so that is what sits highest on
+       the screen. Everything is still here — only the order changes. */
+    var lead = PF.derive().leadWith;
+    var tickerHtml =
+      '<a class="ticker" href="#/kit/scrap" id="ticker">' +
+        '<span class="ticker-tag">💰 Metal</span>' +
+        '<span class="ticker-rail" id="tickerRail"><span class="ticker-load">checking prices…</span></span>' +
+      '</a>';
+    var badgesHtmlBlock = '<h2 class="section-h">Badges</h2><div class="badges">' + badgesHtml() + '</div>';
+
+    // Chips lead with whatever she said matters, so the first glance answers it.
+    var chips = [
+      { k: 'streak', html: '<span class="chip">🔥 ' + s.streak.count + ' day' + (s.streak.count === 1 ? '' : 's') + '</span>' },
+      { k: 'badges', html: '<span class="chip">🏅 ' + s.badges.length + '/' + R.badges.length + '</span>' },
+      { k: 'progress', html: '<span class="chip">🔧 ' + P.drillCount() + ' drills</span>' }
+    ].sort(function (a, b) { return (b.k === lead) - (a.k === lead); })
+     .map(function (c) { return c.html; }).join('');
+
     view.innerHTML =
       '<div class="hero">' +
         '<div class="hero-bg"></div>' +
@@ -334,26 +396,19 @@
           '<div class="hero-ring">' + ring(overall, 'var(--accent)', 76, 6) +
             '<span class="hero-pct">' + overall + '<i>%</i></span></div>' +
           '<div>' +
-            '<div class="hero-hi">G\'day' + (s.name ? ', ' + esc(s.name) : '') + '</div>' +
+            '<div class="hero-hi" id="heroHi">' + esc(greeting()) + (s.name ? ', ' + esc(s.name) : '') + '</div>' +
             '<div class="hero-lvl">' + esc(P.levelTitle()) + ' · Level ' + P.level() + '</div>' +
-            '<div class="hero-chips">' +
-              '<span class="chip">🔥 ' + s.streak.count + ' day' + (s.streak.count === 1 ? '' : 's') + '</span>' +
-              '<span class="chip">🏅 ' + s.badges.length + '/' + R.badges.length + '</span>' +
-              '<span class="chip">🔧 ' + P.drillCount() + ' drills</span>' +
-            '</div>' +
+            '<div class="hero-chips">' + chips + '</div>' +
           '</div>' +
         '</div>' +
       '</div>' +
-      continueCard +
-      '<a class="ticker" href="#/kit/scrap" id="ticker">' +
-        '<span class="ticker-tag">💰 Metal</span>' +
-        '<span class="ticker-rail" id="tickerRail"><span class="ticker-load">checking prices…</span></span>' +
-      '</a>' +
+      // Money first if that is her reason for opening it at all.
+      (lead === 'money' ? tickerHtml + continueCard : continueCard + tickerHtml) +
       dailyCardHtml() +
+      (lead === 'badges' ? badgesHtmlBlock : '') +
       '<h2 class="section-h">The road to a ticket</h2>' +
       '<div class="map">' + mapHtml() + '</div>' +
-      '<h2 class="section-h">Badges</h2>' +
-      '<div class="badges">' + badgesHtml() + '</div>' +
+      (lead === 'badges' ? '' : badgesHtmlBlock) +
       '<div class="footer-note">' +
         '<p>Weld Academy teaches the knowledge, not the ticket. When you want the paper, that is TAFE and a coded test on a real coupon — you will walk in already knowing the job.</p>' +
         '<a class="btn btn--ghost btn--sm" href="#/settings">Settings</a>' +
@@ -548,7 +603,7 @@
       var res = P.recordDaily(right);
       var expl = document.createElement('p');
       expl.className = 'explain';
-      expl.innerHTML = '<b>' + (right ? 'Correct.' : 'Not quite.') + '</b> ' + esc(daily.item.question.explain);
+      expl.innerHTML = '<b>' + esc(PF.line(right ? 'right' : 'wrong')) + '</b> ' + esc(daily.item.question.explain);
       dc.appendChild(expl);
       announce(res, { from: btn });
     });
@@ -743,6 +798,15 @@
     }
     N.setScript(els);
     paintReader(N.status());
+
+    /* She told us she learns by being told, or that she opens this in the ute.
+       Either way the lesson starts reading itself rather than waiting to be
+       asked. One tap on the reader bar stops it. */
+    if (PF.derive().autoRead && els.length) {
+      autoReadTimer = setTimeout(function () {
+        if ($('#reader')) { N.play(0); paintReader(N.status()); }
+      }, 700);
+    }
   }
 
   function paintReader(st) {
@@ -982,7 +1046,7 @@
     var last = quizRun.i === m.quiz.length - 1;
     $('#qFeedback').innerHTML =
       '<div class="feedback ' + (right ? 'is-right' : 'is-wrong') + '">' +
-        '<b>' + (right ? '✓ Correct' : '✗ Not quite') + '</b>' +
+        '<b>' + (right ? '✓ ' : '✗ ') + esc(PF.line(right ? 'right' : 'wrong')) + '</b>' +
         '<p>' + esc(q.explain) + '</p>' +
       '</div>' +
       '<button class="btn btn--primary btn--big" id="qNext">' + (last ? 'See your score →' : 'Next question →') + '</button>';
@@ -1416,6 +1480,20 @@
       '<h1 class="page-h">Settings</h1>' +
 
       '<div class="card">' +
+        '<h3>🎨 How this teaches you</h3>' +
+        '<p class="muted small">Your answers set the colours, which lesson mode opens first, how much Old Mate says, and what the home screen leads with. Change your mind whenever you like.</p>' +
+        '<div class="theme-row" id="themeRow">' +
+          Object.keys(PF.THEMES).map(function (k) {
+            var t = PF.THEMES[k];
+            return '<button class="theme-dot' + (PF.derive().theme === k ? ' is-on' : '') + '" data-theme="' + k + '" ' +
+              'title="' + esc(t.name) + '" aria-label="' + esc(t.name) + '" ' +
+              'style="background:linear-gradient(135deg,' + t.accent2 + ',' + t.accent + ')"></button>';
+          }).join('') +
+        '</div>' +
+        '<button class="btn btn--ghost btn--sm" id="retakeQ">Retake the questions</button>' +
+      '</div>' +
+
+      '<div class="card">' +
         '<h3>Sound &amp; feel</h3>' +
         '<label class="switch"><input type="checkbox" id="soundToggle"' + (J.soundEnabled() ? ' checked' : '') + '>' +
           '<span class="switch-track"><i></i></span><span>Sound effects</span></label>' +
@@ -1473,6 +1551,28 @@
     $('#soundToggle').addEventListener('change', function (e) {
       J.setSound(e.target.checked);
       if (e.target.checked) J.sound('badge');
+    });
+
+    // Colours change under her thumb, without leaving the page.
+    $('#themeRow').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-theme]');
+      if (!btn) return;
+      var ans = PF.answers() || {};
+      ans.colour = btn.getAttribute('data-theme');
+      PF.save(ans);
+      J.sound('tap');
+      J.haptic('tap');
+      J.burstFrom(btn, 18, 0.9);
+      $('#themeRow').querySelectorAll('.theme-dot').forEach(function (b) {
+        b.classList.toggle('is-on', b === btn);
+      });
+    });
+
+    $('#retakeQ').addEventListener('click', function () {
+      if (!confirm('Run through the eight questions again? Your progress, badges and log are not touched.')) return;
+      P.setSetting('profile', null);
+      go('#/home');
+      render();
     });
 
     var voicePick = $('#voicePick');
@@ -1555,7 +1655,9 @@
   function render() {
     var parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
 
-    if (!P.state.name) return renderWelcome();
+    // No name yet means a first run; a name with no profile means she asked to
+    // retake the questions from Settings.
+    if (!P.state.name || !PF.isDone()) return renderWelcome();
 
     header.classList.remove('hidden');
     tabbar.classList.remove('hidden');
@@ -1583,6 +1685,7 @@
 
     P.load();
     shownXp = P.state.xp;
+    PF.apply();                    // her colours, before anything paints
     J.init();
     MK.load();
     if (N.supported()) N.loadPrefs();
@@ -1591,6 +1694,7 @@
     var badges = P.checkBadges();
 
     window.addEventListener('hashchange', function () {
+      if (autoReadTimer) { clearTimeout(autoReadTimer); autoReadTimer = null; }
       if (N.supported()) N.stop();
       render();
       scrollTop();

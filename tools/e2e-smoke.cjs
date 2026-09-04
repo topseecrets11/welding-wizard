@@ -41,17 +41,45 @@ function check(name, cond, extra) {
 
   await page.goto(APP);
 
-  /* ---------- onboarding ---------- */
+  /* ---------- onboarding: name, then the eight profile questions ---------- */
   await page.waitForSelector('#wstart');
   await shot(page, '01-welcome.png');
   await page.fill('#wname', 'Tess');
-  check('onboarding offers learning styles', (await page.locator('.style-opt').count()) === 4);
-  await page.click('[data-style="guts"]');
   await page.click('#wstart');
+
+  // Answer all eight. Deliberate picks so the derived settings are predictable:
+  // hands=bench → the "do" mode opens first, colour=steel → a blue accent.
+  const PICKS = {
+    pace: 'fast', depth: 'why', patience: 'low', push: 'blunt',
+    motivator: 'money', hands: 'bench', when: 'moving', colour: 'steel'
+  };
+  const QIDS = await page.evaluate(() => WA_PROFILE.QUESTIONS.map(q => q.id));
+  check('eight profile questions up front', QIDS.length === 8);
+  for (let i = 0; i < QIDS.length; i++) {
+    // Answering advances on a short delay, so wait for this question's own
+    // option rather than any .q-opt — the previous screen is briefly still up.
+    const sel = `.q-opt[data-v="${PICKS[QIDS[i]]}"]`;
+    let ok = true;
+    try { await page.waitForSelector(sel, { timeout: 4000 }); } catch (e) { ok = false; }
+    if (i === 0) await shot(page, '02-question.png');
+    check(`question ${i + 1} (${QIDS[i]}) is answerable`, ok);
+    if (ok) await page.click(sel);
+  }
+
   await page.waitForSelector('.hero');
   check('onboarding → home', (await page.textContent('.hero-hi')).includes('Tess'));
   check('nine modules on the map', (await page.locator('.node').count()) === 9);
-  check('chosen learning style is saved', await page.evaluate(() => WA_PROGRESS.state.prefMode === 'guts'));
+  check('answers are saved', await page.evaluate(() =>
+    WA_PROFILE.answers().hands === 'bench' && WA_PROFILE.answers().colour === 'steel'));
+  check('answers pick the opening lesson mode',
+    await page.evaluate(() => WA_PROGRESS.state.prefMode === 'do'));
+  check('chosen theme actually recolours the app', await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+      === WA_PROFILE.THEMES.steel.accent));
+  check('money motivator leads the home screen', await page.evaluate(() => {
+    const t = document.querySelector('#ticker'), c = document.querySelector('.continue');
+    return !!t && !!c && (t.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  }));
 
   // --- the menu ---
   await page.click('#menuBtn');
@@ -78,7 +106,9 @@ function check(name, cond, extra) {
   /* ---------- lesson flow ---------- */
   await page.click('.continue');
   await page.waitForSelector('.modes');
-  check('lesson opens in the style chosen at onboarding', (await page.locator('.gut').count()) >= 3);
+  // hands=bench derived the "do" mode, so the lesson opens on the bench drill.
+  check('lesson opens in the mode her answers derived',
+    (await page.locator('.mode[data-mode="do"].is-active').count()) === 1);
   await page.click('[data-mode="read"]');
   await page.waitForSelector('.prose');
   check('lesson opens with prose + key points', (await page.locator('.keybox li').count()) >= 3);
@@ -259,6 +289,33 @@ function check(name, cond, extra) {
   await page.click('.switch-track');
   check('sound toggle persists', await page.evaluate(() => localStorage.getItem('weldAcademy.sound') === 'off'));
   await page.click('.switch-track');
+
+  // Colours are changeable after the fact, without redoing the questions.
+  check('every theme defines every token', await page.evaluate(() =>
+    Object.values(WA_PROFILE.THEMES).every(t => t.name && t.accent && t.accent2 && t.glow && t.tint)));
+  check('settings offers all six themes', (await page.locator('.theme-dot').count()) === 6);
+  await page.click('.theme-dot[data-theme="gold"]');
+  check('picking a theme recolours immediately', await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+      === WA_PROFILE.THEMES.gold.accent));
+  check('theme choice persists', await page.evaluate(() => WA_PROFILE.answers().colour === 'gold'));
+  await page.click('.theme-dot[data-theme="steel"]');
+
+  // Clearing the profile sends her back through the questions, keeping her XP.
+  check('retake returns to the questions, progress intact', await page.evaluate(async () => {
+    const xp = WA_PROGRESS.state.xp;
+    WA_PROGRESS.setSetting('profile', null);
+    location.hash = '#/home';
+    await new Promise(r => setTimeout(r, 260));
+    const asking = !!document.querySelector('.q-opt');
+    WA_PROGRESS.setSetting('profile', { hands: 'bench', colour: 'steel', push: 'blunt', motivator: 'money' });
+    location.hash = '#/settings';
+    await new Promise(r => setTimeout(r, 260));
+    return asking && WA_PROGRESS.state.xp === xp;
+  }));
+  await page.goto(APP + '#/settings');
+  await page.waitForSelector('.switch-track');
+  await dismiss(page);
 
   check('AI scan is off by default', await page.evaluate(() => !WA_VISION.isConfigured()));
   check('no camera card while AI is off', await page.evaluate(async () => {
