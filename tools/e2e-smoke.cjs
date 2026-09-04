@@ -218,9 +218,38 @@ function check(name, cond, extra) {
   // innerText returns CSS-uppercased text, so match case-insensitively.
   check('results are framed as Old Mate\'s call',
     /what old mate reckons/i.test(await page.evaluate(() => document.body.innerText)));
-  check('fix-now steps present', (await page.locator('.dx-sec--fix li').count()) > 0);
   check('Field Medic badge', await page.evaluate(() => WA_PROGRESS.hasBadge('field-medic')));
   await shot(page, '07-doctor.png');
+
+  // His call is on screen; the detail is one tap behind it, in a sheet.
+  // Holes + wind matches porosity alone, so this case has no runners-up.
+  await dismiss(page);
+  check('a single confident answer shows no runners-up',
+    (await page.locator('.tile-btn[data-tile^="dx:"]').count()) === 0);
+  await page.click('.card--dx.is-top [data-dx]');
+  await page.waitForSelector('.sheet.is-open');
+  check('defect sheet opens with fix-now steps', (await page.locator('.sheet .dx-sec--fix li').count()) > 0);
+  check('defect sheet names the defect',
+    (await page.textContent('.sheet-head h2')).includes('Porosity'));
+  await shot(page, '18-sheet.png');
+  await page.click('.sheet-x');
+  await page.waitForSelector('.sheet', { state: 'detached' });
+  check('sheet closes and leaves the page behind it', (await page.locator('.card--dx.is-top').count()) === 1);
+
+  // A vaguer symptom matches several, and those become tiles rather than
+  // another two screens of prose.
+  await page.click('#dxAgain');
+  await page.waitForSelector('.clue');
+  await page.click('.clue:has(input[data-clue="uneven"])');
+  await page.click('#dxBtn');
+  await page.waitForSelector('.card--dx');
+  await dismiss(page);
+  check('runners-up become tiles', (await page.locator('.tile-btn[data-tile^="dx:"]').count()) >= 2);
+  await page.click('.tile-btn[data-tile^="dx:"]');
+  await page.waitForSelector('.sheet.is-open');
+  check('a runner-up opens its own sheet', (await page.locator('.sheet .dx-sec--fix li').count()) > 0);
+  await page.click('.sheet-x');
+  await page.waitForSelector('.sheet', { state: 'detached' });
 
   // a second, different symptom set must give a different answer
   await dismiss(page);
@@ -232,25 +261,45 @@ function check(name, cond, extra) {
   const topDx2 = await page.textContent('.card--dx.is-top h3');
   check('delayed crack → cold cracking', topDx2.includes('Cold cracking'), { topDx2 });
 
-  /* ---------- field kit ---------- */
+  /* ---------- field kit: everything long is now a tile + sheet ---------- */
   await page.goto(APP + '#/kit/checklist');
-  await page.waitForSelector('.check');
-  const boxes = await page.locator('.check').count();
+  await page.waitForSelector('.tile-btn');
   await dismiss(page);
-  await page.click('.card--check .check');
+  check('pre-flight sections are tiles', (await page.locator('.tile-btn[data-tile^="check:"]').count()) === 4);
+  await page.click('.tile-btn[data-tile="check:0"]');
+  await page.waitForSelector('.sheet.is-open .check');
+  await page.click('.sheet .check');
   check('checklist ticks persist to state',
-    await page.evaluate(() => Object.keys(WA_PROGRESS.state.checklist).length === 1), { boxes });
+    await page.evaluate(() => Object.keys(WA_PROGRESS.state.checklist).length === 1));
+  check('the tile behind the sheet updates as she ticks',
+    /1 of/.test(await page.textContent('.tile-btn[data-tile="check:0"] .tile-s')));
   await shot(page, '08-checklist.png');
+  // The panel covers the middle of the screen, so tap the backdrop up top —
+  // which is where the exposed part of it actually is on a phone.
+  await page.click('.sheet-back', { position: { x: 20, y: 20 } });
+  await page.waitForSelector('.sheet', { state: 'detached' });
+  check('tapping outside closes the sheet', (await page.locator('.sheet').count()) === 0);
 
   await page.goto(APP + '#/kit/sheets');
-  await page.waitForSelector('table');
-  check('four cheat sheets render', (await page.locator('.card--sheet').count()) === 4);
+  await page.waitForSelector('.tile-btn');
+  check('four cheat sheets as tiles', (await page.locator('.tile-btn[data-tile^="cheat:"]').count()) === 4);
+  await dismiss(page);
+  await page.click('.tile-btn[data-tile="cheat:0"]');
+  await page.waitForSelector('.sheet.is-open table');
+  check('cheat sheet opens its table in a sheet', (await page.locator('.sheet table tbody tr').count()) > 0);
   await shot(page, '09-sheets.png');
+  await page.click('.sheet-x');
+  await page.waitForSelector('.sheet', { state: 'detached' });
 
   await page.goto(APP + '#/kit/scrap');
   await page.waitForSelector('.price');
   check('six price cards render', (await page.locator('.price').count()) === 6);
-  check('scrap guide sections render', (await page.locator('.card--scrap').count()) === 6);
+  check('scrap guide sections are tiles', (await page.locator('.tile-btn[data-tile^="scrap:"]').count()) === 6);
+  await page.click('.tile-btn[data-tile="scrap:0"]');
+  await page.waitForSelector('.sheet.is-open');
+  check('scrap guide opens in a sheet', (await page.locator('.sheet-body li').count()) > 0);
+  await page.click('.sheet-x');
+  await page.waitForSelector('.sheet', { state: 'detached' });
   check('spot-vs-yard warning is shown', (await page.locator('.card--warn').count()) === 1);
   check('prices degrade gracefully with no network',
     (await page.textContent('.price-val')).length > 0);

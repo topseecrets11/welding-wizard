@@ -60,6 +60,89 @@
 
   function tap() { J.sound('tap'); J.haptic('tap'); }
 
+  /* ========================= tiles and sheets ===========================
+   * Long pages lose her. Everything that used to be a wall of stacked cards
+   * is now a grid of tiles, and the detail lives in a sheet that slides up
+   * over the top — so no page is longer than a couple of thumb-flicks and she
+   * always knows how to get back (tap outside, swipe down, or the ✕).
+   * ====================================================================== */
+
+  var sheetEl = null;
+
+  /* tiles([{ icon, title, sub, key }]) — the grid. Handling of taps is left to
+     the caller, which reads data-tile off the clicked element. */
+  function tiles(items) {
+    return '<div class="tiles">' +
+      items.map(function (t) {
+        return '<button class="tile-btn" data-tile="' + esc(t.key) + '">' +
+          '<span class="tile-ico">' + (t.icon || '•') + '</span>' +
+          '<span class="tile-t">' + esc(t.title) + '</span>' +
+          (t.sub ? '<span class="tile-s">' + esc(t.sub) + '</span>' : '') +
+        '</button>';
+      }).join('') +
+    '</div>';
+  }
+
+  function closeSheet() {
+    if (!sheetEl) return;
+    var el = sheetEl;
+    sheetEl = null;
+    el.classList.remove('is-open');
+    if (N.supported()) N.stop();
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+  }
+
+  /* openSheet(title, bodyHtml) — one bottom sheet, reused everywhere. */
+  function openSheet(title, bodyHtml) {
+    closeSheet();
+    var el = document.createElement('div');
+    el.className = 'sheet';
+    el.innerHTML =
+      '<div class="sheet-back"></div>' +
+      '<div class="sheet-panel" role="dialog" aria-modal="true" aria-label="' + esc(title) + '">' +
+        '<div class="sheet-grab"></div>' +
+        '<div class="sheet-head">' +
+          '<h2>' + esc(title) + '</h2>' +
+          '<button class="sheet-x" aria-label="Close">✕</button>' +
+        '</div>' +
+        '<div class="sheet-body">' + bodyHtml + '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+    sheetEl = el;
+    // Next frame, so the slide-up transition actually runs.
+    requestAnimationFrame(function () { el.classList.add('is-open'); });
+
+    el.querySelector('.sheet-back').addEventListener('click', closeSheet);
+    el.querySelector('.sheet-x').addEventListener('click', function () { tap(); closeSheet(); });
+
+    // Swipe down to dismiss, the way every other sheet on the phone works.
+    var panel = el.querySelector('.sheet-panel');
+    var startY = null;
+    panel.addEventListener('touchstart', function (e) {
+      startY = panel.scrollTop <= 0 ? e.touches[0].clientY : null;
+    }, { passive: true });
+    panel.addEventListener('touchmove', function (e) {
+      if (startY == null) return;
+      var dy = e.touches[0].clientY - startY;
+      if (dy > 0) panel.style.transform = 'translateY(' + dy + 'px)';
+    }, { passive: true });
+    panel.addEventListener('touchend', function (e) {
+      if (startY == null) return;
+      var dy = (e.changedTouches[0].clientY - startY);
+      panel.style.transform = '';
+      startY = null;
+      if (dy > 90) closeSheet();
+    });
+
+    tap();
+    return el;
+  }
+
+  // Escape closes it, same as the ✕.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && sheetEl) closeSheet();
+  });
+
   /* ============================ toasts ================================== */
 
   function toast(msg, kind) {
@@ -479,13 +562,20 @@
         'And no oil price up there: there is no free source a phone can call directly, so rather than fake it, it is left out.</p>' +
       '</div>' +
 
-      R.scrapGuide.map(function (sec) {
-        return '<div class="card card--scrap">' +
-          '<h3>' + sec.icon + ' ' + esc(sec.title) + '</h3>' +
-          sec.body.map(function (b) { return '<p>' + fmt(b) + '</p>'; }).join('') +
-          '<ul>' + sec.points.map(function (pt) { return '<li>' + fmt(pt) + '</li>'; }).join('') + '</ul>' +
-        '</div>';
-      }).join('');
+      '<h2 class="section-h">The metal trade</h2>' +
+      tiles(R.scrapGuide.map(function (sec, i) {
+        return { key: 'scrap:' + i, icon: sec.icon, title: sec.title,
+                 sub: sec.points.length + ' things worth knowing' };
+      }));
+  }
+
+  /* One scrap-guide section, opened from its tile. */
+  function openScrapSheet(i) {
+    var sec = R.scrapGuide[i];
+    if (!sec) return;
+    openSheet(sec.icon + ' ' + sec.title,
+      sec.body.map(function (b) { return '<p>' + fmt(b) + '</p>'; }).join('') +
+      '<ul>' + sec.points.map(function (pt) { return '<li>' + fmt(pt) + '</li>'; }).join('') + '</ul>');
   }
 
   /* Prices can take seconds to land on a bad connection, and by then she may
@@ -1226,6 +1316,23 @@
       .sort(function (a, b) { return b.score - a.score; });
   }
 
+  /* The full write-up on one defect: why it happened, what to do about it now,
+     and how to stop it next time. */
+  function openDefectSheet(id) {
+    var d = R.defects.filter(function (x) { return (x.id || x.name) === id; })[0];
+    if (!d) return;
+    openSheet(d.icon + ' ' + d.name,
+      '<p class="dx-sev">' + esc(d.severity) + '</p>' +
+      '<p class="dx-plain">' + esc(d.plain) + '</p>' +
+      '<div class="dx-sec"><b>Why it happened</b><ul>' +
+        d.causes.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></div>' +
+      '<div class="dx-sec dx-sec--fix"><b>Fix it now</b><ul>' +
+        d.fixNow.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></div>' +
+      '<div class="dx-sec"><b>Stop it happening again</b><ul>' +
+        d.prevent.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></div>' +
+      '<p class="dx-note">' + esc(d.processNote) + '</p>');
+  }
+
   function showDiagnosis(clueIds) {
     var results = diagnose(clueIds).slice(0, 3);
     var host = $('#dxResults');
@@ -1236,31 +1343,33 @@
     }
 
     var maxScore = results[0].score;
+    var top = results[0].defect;
 
+    /* His call goes on screen straight away — she is standing at the bench
+       wanting an answer, not a reading list. The detail is one tap behind it,
+       and the runners-up are tiles rather than another two screens of prose. */
     host.innerHTML =
       '<h2 class="section-h">What Old Mate reckons</h2>' +
-      (results.length > 1 ? '<p class="page-sub small">Ranked most to least likely. Two faults often ride together, so read past the first one.</p>' : '') +
-      results.map(function (r, i) {
-        var d = r.defect;
-        var confidence = Math.round((r.score / maxScore) * 100);
-        return '<div class="card card--dx' + (i === 0 ? ' is-top' : '') + '">' +
-          '<div class="dx-head">' +
-            '<span class="dx-icon">' + d.icon + '</span>' +
-            '<div><h3>' + esc(d.name) + '</h3>' +
-              '<div class="dx-conf"><span style="width:' + confidence + '%"></span></div>' +
-              '<div class="dx-sev">' + esc(d.severity) + '</div>' +
-            '</div>' +
+      '<div class="card card--dx is-top">' +
+        '<div class="dx-head">' +
+          '<span class="dx-icon">' + top.icon + '</span>' +
+          '<div><h3>' + esc(top.name) + '</h3>' +
+            '<div class="dx-conf"><span style="width:100%"></span></div>' +
+            '<div class="dx-sev">' + esc(top.severity) + '</div>' +
           '</div>' +
-          '<p class="dx-plain">' + esc(d.plain) + '</p>' +
-          '<div class="dx-sec"><b>Why it happened</b><ul>' +
-            d.causes.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></div>' +
-          '<div class="dx-sec dx-sec--fix"><b>Fix it now</b><ul>' +
-            d.fixNow.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></div>' +
-          '<div class="dx-sec"><b>Stop it happening again</b><ul>' +
-            d.prevent.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></div>' +
-          '<p class="dx-note">' + esc(d.processNote) + '</p>' +
-        '</div>';
-      }).join('') +
+        '</div>' +
+        '<p class="dx-plain">' + esc(top.plain) + '</p>' +
+        '<button class="btn btn--primary" data-dx="' + esc(top.id || top.name) + '">Why, and how to fix it →</button>' +
+      '</div>' +
+      (results.length > 1
+        ? '<h2 class="section-h">Also worth a look</h2>' +
+          '<p class="page-sub small">Two faults often ride together, so read past the first one.</p>' +
+          tiles(results.slice(1).map(function (r) {
+            return { key: 'dx:' + (r.defect.id || r.defect.name), icon: r.defect.icon,
+                     title: r.defect.name,
+                     sub: Math.round((r.score / maxScore) * 100) + '% as likely' };
+          }))
+        : '') +
       '<div class="doctor-actions">' +
         '<a class="btn btn--primary" href="#/kit/log">📓 Log this weld with a photo</a>' +
         '<button class="btn btn--ghost btn--sm" id="dxAgain">Start again</button>' +
@@ -1268,6 +1377,14 @@
 
     pendingLogDiagnosis = results[0].defect.name;
     announce(P.markDoctorUsed());
+
+    host.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-dx],[data-tile]');
+      if (!btn) return;
+      var id = btn.getAttribute('data-dx') ||
+               (btn.getAttribute('data-tile') || '').replace(/^dx:/, '');
+      openDefectSheet(id);
+    });
 
     $('#dxAgain').addEventListener('click', function () {
       doctorPicks = {};
@@ -1308,46 +1425,87 @@
     if (tab === 'checklist') wireChecklist();
     if (tab === 'log') wireLog();
     if (tab === 'scrap') wireScrap();
+
+    // One delegated handler for every tile on this page.
+    $('#kitBody').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-tile]');
+      if (!btn) return;
+      var parts = btn.getAttribute('data-tile').split(':');
+      if (parts[0] === 'scrap') openScrapSheet(+parts[1]);
+      else if (parts[0] === 'cheat') openCheatSheet(+parts[1]);
+      else if (parts[0] === 'check') openCheckSheet(+parts[1]);
+    });
+  }
+
+  /* How many of a pre-flight section are ticked right now. */
+  function checkTally(sec) {
+    var checked = P.checklistState();
+    var done = 0;
+    sec.items.forEach(function (_, i) { if (checked[sec.id + ':' + i]) done++; });
+    return { done: done, total: sec.items.length };
+  }
+
+  function checkTotals() {
+    var t = { done: 0, total: 0 };
+    R.preflight.forEach(function (sec) {
+      var c = checkTally(sec);
+      t.done += c.done; t.total += c.total;
+    });
+    return t;
   }
 
   function kitChecklist() {
-    var checked = P.checklistState();
-    var total = 0, done = 0;
+    var t = checkTotals();
+    return '<p class="page-sub">Run this before the helmet comes down. It resets itself each day.</p>' +
+      '<div class="check-progress"><span id="checkCount">' + t.done + ' of ' + t.total + '</span> ticked' +
+      '<button class="btn btn--ghost btn--sm" id="checkReset">Reset</button></div>' +
+      tiles(R.preflight.map(function (sec, i) {
+        var c = checkTally(sec);
+        return { key: 'check:' + i, icon: c.done === c.total ? '✅' : sec.icon, title: sec.title,
+                 sub: c.done + ' of ' + c.total + ' ticked' };
+      }));
+  }
 
-    var sections = R.preflight.map(function (sec) {
-      var items = sec.items.map(function (item, i) {
-        var key = sec.id + ':' + i;
+  /* One pre-flight section. Ticking inside the sheet writes straight through,
+     so closing it is never "losing" anything. */
+  function openCheckSheet(i) {
+    var sec = R.preflight[i];
+    if (!sec) return;
+    var checked = P.checklistState();
+    var el = openSheet(sec.icon + ' ' + sec.title,
+      sec.items.map(function (item, n) {
+        var key = sec.id + ':' + n;
         var on = !!checked[key];
-        total++; if (on) done++;
         return '<label class="check' + (on ? ' is-on' : '') + '">' +
           '<input type="checkbox" data-check="' + key + '"' + (on ? ' checked' : '') + '>' +
           '<span class="clue-box"></span><span>' + esc(item) + '</span>' +
         '</label>';
-      }).join('');
-      return '<div class="card card--check"><h3>' + sec.icon + ' ' + esc(sec.title) + '</h3>' + items + '</div>';
-    }).join('');
+      }).join(''));
 
-    return '<p class="page-sub">Run this before the helmet comes down. It resets itself each day.</p>' +
-      '<div class="check-progress"><span id="checkCount">' + done + ' of ' + total + '</span> ticked' +
-      '<button class="btn btn--ghost btn--sm" id="checkReset">Reset</button></div>' + sections;
-  }
-
-  function wireChecklist() {
-    var body = $('#kitBody');
-    body.addEventListener('change', function (e) {
+    el.addEventListener('change', function (e) {
       var cb = e.target.closest('[data-check]');
       if (!cb) return;
       P.toggleChecklist(cb.getAttribute('data-check'), cb.checked);
       cb.closest('.check').classList.toggle('is-on', cb.checked);
       tap();
-      var all = body.querySelectorAll('[data-check]');
-      var on = body.querySelectorAll('[data-check]:checked');
-      $('#checkCount').textContent = on.length + ' of ' + all.length;
-      if (on.length === all.length) {
+      var t = checkTotals();
+      var count = $('#checkCount');
+      if (count) count.textContent = t.done + ' of ' + t.total;
+      // Keep the tile behind the sheet honest while she works.
+      var tile = document.querySelector('[data-tile="check:' + i + '"]');
+      if (tile) {
+        var c = checkTally(sec);
+        tile.querySelector('.tile-s').textContent = c.done + ' of ' + c.total + ' ticked';
+        tile.querySelector('.tile-ico').textContent = c.done === c.total ? '✅' : sec.icon;
+      }
+      if (t.done === t.total) {
         J.shower(50); J.sound('complete'); J.haptic('badge');
         toast('Whole list ticked. Go and weld. 🔥', 'xp');
       }
     });
+  }
+
+  function wireChecklist() {
     $('#checkReset').addEventListener('click', function () {
       P.resetChecklist();
       renderKit('checklist');
@@ -1356,19 +1514,26 @@
 
   function kitSheets() {
     return '<p class="page-sub">Starting points, not gospel. Set the machine here, run a test bead on scrap, then trust your eyes and ears.</p>' +
-      R.cheatsheets.map(function (s) {
-        return '<div class="card card--sheet">' +
-          '<h3>' + s.icon + ' ' + esc(s.title) + '</h3>' +
-          '<p class="sheet-note">' + esc(s.note) + '</p>' +
-          '<div class="table-wrap"><table>' +
-            '<thead><tr>' + s.columns.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead>' +
-            '<tbody>' + s.rows.map(function (r) {
-              return '<tr>' + r.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>';
-            }).join('') + '</tbody>' +
-          '</table></div>' +
-          '<ul class="sheet-extras">' + s.extras.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul>' +
-        '</div>';
-      }).join('');
+      tiles(R.cheatsheets.map(function (s, i) {
+        return { key: 'cheat:' + i, icon: s.icon, title: s.title,
+                 sub: s.rows.length + ' settings' };
+      }));
+  }
+
+  /* One cheat sheet, opened from its tile. The table scrolls inside the sheet
+     rather than pushing the page sideways. */
+  function openCheatSheet(i) {
+    var s = R.cheatsheets[i];
+    if (!s) return;
+    openSheet(s.icon + ' ' + s.title,
+      '<p class="sheet-note">' + esc(s.note) + '</p>' +
+      '<div class="table-wrap"><table>' +
+        '<thead><tr>' + s.columns.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead>' +
+        '<tbody>' + s.rows.map(function (r) {
+          return '<tr>' + r.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>';
+        }).join('') + '</tbody>' +
+      '</table></div>' +
+      '<ul class="sheet-extras">' + s.extras.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul>');
   }
 
   function kitLog() {
