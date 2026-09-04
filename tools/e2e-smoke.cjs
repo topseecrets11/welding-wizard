@@ -366,6 +366,41 @@ function check(name, cond, extra) {
   await page.waitForSelector('.switch-track');
   await dismiss(page);
 
+  /* ---------- Old Mate's voice ---------- */
+  check('two voice personas offered', (await page.locator('.persona').count()) === 2);
+  check('the wise one is the default', await page.evaluate(() => WA_NARRATOR.currentPersona().id === 'wise'));
+  check('wise is pitched low and unhurried', await page.evaluate(() => {
+    const p = WA_NARRATOR.currentPersona();
+    return p.pitch < 1 && p.rate < 1 && p.want === 'male';
+  }));
+  await page.click('.persona[data-persona="easy"]');
+  check('persona switches and persists', await page.evaluate(() =>
+    WA_NARRATOR.currentPersona().id === 'easy' &&
+    localStorage.getItem('weldAcademy.readPersona') === 'easy'));
+  await page.click('.persona[data-persona="wise"]');
+
+  // Numbers and trade shorthand have to be spoken, not spelled out.
+  check('numbers are spoken properly', await page.evaluate(() =>
+    WA_SCRIPT.forSpeech('Run 3.2 mm rods at 90-120 A, gas 12–15 L/min.')
+      === 'Run 3 point 2 millimetre rods at 90 to 120 amps, gas 12 to 15 litres per minute.'));
+  check('trade shorthand is spoken, not spelled', await page.evaluate(() => {
+    const s = WA_SCRIPT.forSpeech('GMAW per AS/NZS 1554.');
+    return s.includes('mig welding') && s.includes('A S, N Z S');
+  }));
+  check('a whole unit assembles into a spoken script', await page.evaluate(() => {
+    const m = WA_CONTENT.modules[2];
+    const lines = WA_SCRIPT.unit(m);
+    return lines.length > 20 &&
+      lines[0].kind === 'intro' &&
+      lines[lines.length - 1].kind === 'outro' &&
+      lines.some(l => l.kind === 'link');
+  }));
+  check('diagrams are described rather than skipped', await page.evaluate(() => {
+    const m = WA_CONTENT.modules.find(x => x.id === 'smaw');
+    const les = m.lessons.find(l => l.id === 'smaw-3');
+    return WA_SCRIPT.lesson(m, les).some(l => l.kind === 'diagram');
+  }));
+
   check('AI scan is off by default', await page.evaluate(() => !WA_VISION.isConfigured()));
   check('no camera card while AI is off', await page.evaluate(async () => {
     location.hash = '#/doctor';

@@ -1668,6 +1668,13 @@
       (N.supported() ? '<div class="card">' +
         '<h3>🔊 Read it to me</h3>' +
         '<p class="muted small">Every lesson has a play button. It uses your phone\'s own voice, so it keeps working with no signal — good for studying in the ute.</p>' +
+        '<div class="persona-row" id="personaRow">' +
+          N.personas().map(function (p) {
+            return '<button class="persona' + (N.currentPersona().id === p.id ? ' is-on' : '') + '" data-persona="' + p.id + '">' +
+              '<b>' + esc(p.name) + '</b><i>' + esc(p.blurb) + '</i></button>';
+          }).join('') +
+        '</div>' +
+        '<p class="muted small">Your phone decides how many voices it has, so these pick the closest match it can find. Override it below if you would rather.</p>' +
         '<label class="field"><span>Voice</span><select class="input" id="voicePick">' +
           '<option value="">Phone default</option>' +
           N.voices().map(function (v) {
@@ -1739,6 +1746,23 @@
       go('#/home');
       render();
     });
+
+    var personaRow = $('#personaRow');
+    if (personaRow) {
+      personaRow.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-persona]');
+        if (!btn) return;
+        N.setPersona(btn.getAttribute('data-persona'));
+        tap();
+        personaRow.querySelectorAll('.persona').forEach(function (b) {
+          b.classList.toggle('is-on', b === btn);
+        });
+        // Let her hear the difference straight away — that is the whole point.
+        N.setScript([{ textContent: WA_SCRIPT.forSpeech(
+          'Right. Hold the arc about one electrode diameter off the work, and keep it moving.') }]);
+        N.play(0);
+      });
+    }
 
     var voicePick = $('#voicePick');
     if (voicePick) {

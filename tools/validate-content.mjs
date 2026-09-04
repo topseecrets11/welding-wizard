@@ -11,7 +11,7 @@ const root = join(here, '..');
 
 const sandbox = { window: {} };
 for (const file of ['js/content.js', 'js/reference.js', 'js/diagrams.js',
-                    'js/practice.js', 'js/content-mastery.js']) {
+                    'js/practice.js', 'js/content-mastery.js', 'js/script.js']) {
   const src = readFileSync(join(root, file), 'utf8');
   new Function('window', src)(sandbox.window);
 }
@@ -21,6 +21,7 @@ const R = sandbox.window.WA_REFERENCE;
 const PR = sandbox.window.WA_PRACTICE;
 const DG = sandbox.window.WA_DIAGRAMS;
 const DMAP = sandbox.window.WA_DIAGRAM_MAP;
+const SC = sandbox.window.WA_SCRIPT;
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -170,6 +171,44 @@ for (const s of R?.cheatsheets ?? []) {
 
 for (const sec of R?.preflight ?? []) {
   if (!sec.id || !sec.title || !sec.items?.length) fail(`Pre-flight section "${sec.id}" is incomplete`);
+}
+
+/* ---- spoken scripts: every lesson has to work with no screen ---- */
+
+for (const m of C?.modules ?? []) {
+  for (const les of m.lessons) {
+    const lines = SC.lesson(m, les);
+    if (!lines.length) fail(`Lesson "${les.id}" produces an empty spoken script`);
+    if (lines.some((l) => !l.text.trim())) fail(`Lesson "${les.id}" has a blank spoken line`);
+    // Units left unspoken are the giveaway that something reads as robot.
+    const raw = lines.map((l) => l.text).join(' ');
+    const leftover = raw.match(/\d+\s?(mm|kg|L\/min|m\/min)\b/);
+    if (leftover) fail(`Lesson "${les.id}" leaves "${leftover[0]}" unspoken in its script`);
+  }
+  const u = SC.unit(m);
+  if (!u.length) fail(`Unit "${m.id}" produces an empty spoken script`);
+  if (SC.seconds(u) < 60) fail(`Unit "${m.id}" spoken script is implausibly short`);
+}
+
+// Every diagram the course shows needs a spoken description, or the audio
+// version quietly drops part of the explanation.
+for (const id of DG?.ids ?? []) {
+  if (!SC.diagramLine(id)) fail(`Diagram "${id}" has no spoken description in js/script.js`);
+}
+
+/* ---- offline: every script the page loads must be cached ----
+   Forgetting one here does not break anything until she is somewhere with no
+   signal, which is exactly where this app is meant to work. */
+
+const html = readFileSync(join(root, 'index.html'), 'utf8');
+const sw = readFileSync(join(root, 'service-worker.js'), 'utf8');
+const loaded = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
+for (const src of loaded) {
+  if (!sw.includes(`'./${src}'`)) fail(`index.html loads ${src} but service-worker.js does not cache it`);
+}
+const cssLinks = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+for (const href of cssLinks) {
+  if (!sw.includes(`'./${href}'`)) fail(`index.html loads ${href} but service-worker.js does not cache it`);
 }
 
 /* ---- report ---- */
