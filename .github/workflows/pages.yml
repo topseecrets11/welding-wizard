@@ -30,6 +30,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       # server/ has real (if low-stakes) sync data files it writes locally
       # during self-hosting; never publish it to the public site.
