@@ -48,6 +48,8 @@ window.WA_REFERENCE = {
     { id: 'metal',         icon: '🌡️', name: 'Heat Whisperer',      desc: 'Complete the Metal & Heat mastery unit.' },
     { id: 'materials',     icon: '🧪', name: 'Alloy Hand',           desc: 'Complete the Beyond Mild Steel mastery unit.' },
     { id: 'ticket',        icon: '🎓', name: 'Test Ready',           desc: 'Complete the Fit-up & the Ticket mastery unit.' },
+    { id: 'salvage',       icon: '🔌', name: 'Live Wire',            desc: 'Complete the Electrics & Salvage unit.' },
+    { id: 'merchant',      icon: '💰', name: 'Knows the Grades',     desc: 'Complete the optional Metal Trade unit.' },
     { id: 'ticket-ready',  icon: '🥇', name: 'The Full Set',         desc: 'Complete every module, core and mastery.' }
   ],
 

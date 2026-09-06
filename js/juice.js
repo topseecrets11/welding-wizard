@@ -252,11 +252,16 @@ window.WA_JUICE = (function () {
     var o = queue.shift();
 
     var wrap = document.createElement('div');
-    wrap.className = 'celebrate celebrate--' + (o.kind || 'badge');
+    wrap.className = 'celebrate celebrate--' + (o.kind || 'badge') +
+      (o.character ? ' celebrate--' + o.character : '');
     wrap.innerHTML =
       '<div class="celebrate-card">' +
         '<div class="celebrate-glow"></div>' +
-        '<div class="celebrate-icon">' + (o.icon || '🏅') + '</div>' +
+        // `art` takes an SVG string for anything with a real picture (the
+        // dolls); `icon` is the emoji fallback. `character` only adds a class,
+        // so a skin can be dropped in later without touching this.
+        (o.art ? '<div class="celebrate-art">' + o.art + '</div>'
+               : '<div class="celebrate-icon">' + (o.icon || '🏅') + '</div>') +
         '<div class="celebrate-kicker">' + (o.kicker || '') + '</div>' +
         '<div class="celebrate-title">' + (o.title || '') + '</div>' +
         (o.subtitle ? '<div class="celebrate-sub">' + o.subtitle + '</div>' : '') +

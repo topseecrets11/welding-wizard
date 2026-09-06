@@ -73,6 +73,9 @@ window.WA_PROGRESS = (function () {
       storageOK = false;
       console.warn('Weld Academy: could not save progress —', e && e.name);
     }
+    // localStorage stays the source of truth regardless; this is only ever
+    // an opportunistic, debounced, best-effort echo of it — see js/sync.js.
+    if (window.WA_SYNC) window.WA_SYNC.scheduleAutoPush();
   }
 
   function load() {
@@ -91,6 +94,24 @@ window.WA_PROGRESS = (function () {
       console.warn('Weld Academy: storage unavailable, running in memory only.');
     }
     return state;
+  }
+
+  /* Wholesale replace the state — what a sync pull needs. `state` is exposed
+     to the rest of the app as a getter-only accessor (see the return block
+     below), specifically so nothing outside this module can do exactly this
+     by assignment; this function is the one sanctioned way in, and it goes
+     through the same merge-onto-defaults as load() so a snapshot saved by an
+     older version of the app (missing a field this version added) does not
+     hand back a state object with holes in it. */
+  function replaceState(incoming) {
+    if (!incoming || typeof incoming !== 'object') return false;
+    var base = defaults();
+    Object.keys(base).forEach(function (k) {
+      if (incoming[k] !== undefined && incoming[k] !== null) base[k] = incoming[k];
+    });
+    state = base;
+    save();
+    return true;
   }
 
   /* --------------------------------------------------------------- levels */
@@ -202,11 +223,22 @@ window.WA_PROGRESS = (function () {
 
   // A module unlocks when the one before it is complete. The UI still offers a
   // "start anyway" — never hard-block someone standing at a machine.
+  //
+  // Optional units sit outside that chain entirely: they are always open, and
+  // they never gate anything after them. Making her finish nine welding units
+  // to unlock something optional would be daft, and so would blocking the
+  // course on something she never has to do.
   function moduleUnlocked(moduleId) {
     var mods = window.WA_CONTENT.modules;
     var i = mods.findIndex(function (m) { return m.id === moduleId; });
     if (i <= 0) return true;
-    return moduleComplete(mods[i - 1].id);
+    if (mods[i].tier === 'advanced') return true;
+    // Walk back past any optional units to the last one on the main path.
+    for (var j = i - 1; j >= 0; j--) {
+      if (mods[j].tier === 'advanced') continue;
+      return moduleComplete(mods[j].id);
+    }
+    return true;
   }
 
   function overallPercent() {
@@ -252,17 +284,27 @@ window.WA_PROGRESS = (function () {
   function completeLesson(moduleId, lessonId) {
     var before = level();
     var gained = 0;
+    var finishedModule = null;
     if (!state.lessons[lessonId]) {
+      var wasComplete = moduleComplete(moduleId);
       state.lessons[lessonId] = true;
       gained += XP.lesson;
       state.xp += XP.lesson;
-      if (moduleComplete(moduleId)) {
+      // Only the lesson that tips the unit over counts as finishing it, so the
+      // celebration fires once rather than on every revisit.
+      if (!wasComplete && moduleComplete(moduleId)) {
+        finishedModule = moduleId;
         gained += XP.moduleComplete;
         state.xp += XP.moduleComplete;
       }
       save();
     }
-    return { xp: gained, newBadges: checkBadges(), levelUp: level() > before };
+    return {
+      xp: gained,
+      newBadges: checkBadges(),
+      levelUp: level() > before,
+      moduleComplete: finishedModule
+    };
   }
 
   // XP only for the first sitting; retakes are free practice.
@@ -477,6 +519,7 @@ window.WA_PROGRESS = (function () {
   return {
     XP: XP,
     load: load,
+    replaceState: replaceState,
     save: save,
     get state() { return state; },
     todayKey: todayKey,

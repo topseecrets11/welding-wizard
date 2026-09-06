@@ -40,6 +40,7 @@ function check(name, cond, extra) {
   });
 
   await page.goto(APP);
+  const WA_MODULE_COUNT = await page.evaluate(() => WA_CONTENT.modules.length);
 
   /* ---------- onboarding: name, then the eight profile questions ---------- */
   await page.waitForSelector('#wstart');
@@ -68,7 +69,23 @@ function check(name, cond, extra) {
 
   await page.waitForSelector('.hero');
   check('onboarding → home', (await page.textContent('.hero-hi')).includes('Tess'));
-  check('nine modules on the map', (await page.locator('.node').count()) === 9);
+    // The optional unit is deliberately off the main road, so the map shows the
+  // core and mastery units only.
+  check('the map shows the main path, not the optional unit', await page.evaluate(() => {
+    const onPath = WA_CONTENT.modules.filter(m => m.tier !== 'advanced').length;
+    return document.querySelectorAll('.node').length === onPath &&
+      WA_CONTENT.modules.some(m => m.tier === 'advanced');
+  }));
+  check('the optional unit is offered separately, marked optional', await page.evaluate(() => {
+    const t = document.querySelector('[data-tile^="opt:"]');
+    return !!t && /optional/i.test(t.textContent);
+  }));
+  check('optional units never gate the main path', await page.evaluate(() => {
+    // Every advanced unit is open from the start, and none of them blocks
+    // whatever comes after it in the list.
+    const adv = WA_CONTENT.modules.filter(m => m.tier === 'advanced');
+    return adv.length > 0 && adv.every(m => WA_PROGRESS.moduleUnlocked(m.id));
+  }));
   check('answers are saved', await page.evaluate(() =>
     WA_PROFILE.answers().hands === 'bench' && WA_PROFILE.answers().colour === 'steel'));
   check('answers pick the opening lesson mode',
@@ -85,7 +102,7 @@ function check(name, cond, extra) {
   await page.click('#menuBtn');
   await page.waitForSelector('.drawer-panel');
   check('menu lists every unit plus the shed tools',
-    (await page.locator('.drawer-item').count()) === 9 + 5 + 2);
+    (await page.locator('.drawer-item').count()) === WA_MODULE_COUNT + 8 + 4);
   await shot(page, '16-menu.png');
   await page.click('.drawer-x');
   await page.waitForTimeout(320);
@@ -194,7 +211,7 @@ function check(name, cond, extra) {
   await page.goto(APP + '#/course');
   await page.waitForSelector('.card--module');
   const locked = await page.locator('.card--module.is-locked').count();
-  check('module 2 unlocked after module 1 passed', locked === 7, { lockedCards: locked });
+  check('module 2 unlocked after module 1 passed', locked === WA_MODULE_COUNT - 3, { lockedCards: locked });
   check('mastery tier is shown separately', (await page.locator('.section-h').count()) >= 2);
   await shot(page, '06-course.png');
 
@@ -331,6 +348,256 @@ function check(name, cond, extra) {
   check('Logbook badge', await page.evaluate(() => WA_PROGRESS.hasBadge('logbook')));
   await shot(page, '10-log.png');
 
+  /* ---------- the salvage unit, and what leads versus what is offered ---- */
+  check('the practical salvage unit is core, not optional', await page.evaluate(() => {
+    const m = WA_CONTENT.modules.find(x => x.id === 'salvage');
+    return m && (m.tier || 'core') === 'core' && m.lessons.length === 4;
+  }));
+  check('the merchant unit is explicitly optional', await page.evaluate(() => {
+    const m = WA_CONTENT.modules.find(x => x.id === 'merchant');
+    return m && m.tier === 'advanced';
+  }));
+  check('it teaches soldering, testing and reading scrap before any trading',
+    await page.evaluate(() => {
+      const m = WA_CONTENT.modules.find(x => x.id === 'salvage');
+      const t = m.lessons.map(l => l.title.toLowerCase()).join(' | ');
+      return /solder/.test(t) && /multimeter/.test(t) && /inside/.test(t);
+    }));
+  check('the cans maths is stated once and is right', await page.evaluate(() => {
+    const m = WA_CONTENT.modules.find(x => x.id === 'salvage');
+    const l = m.lessons.find(x => x.id === 'salvage-4');
+    const all = (l.body.join(' ') + l.keyPoints.join(' '));
+    // ~15 g a can → 65-70 to the kilo; the refund must beat the scrap value.
+    return /65\D{1,4}70/.test(all) && /refund/i.test(all) &&
+      /never crush|never.*scrap/i.test(all);
+  }));
+  check('both new units have drills and recall cards', await page.evaluate(() =>
+    ['salvage', 'merchant'].every(id =>
+      WA_CONTENT.modules.find(m => m.id === id).lessons
+        .every(l => WA_PRACTICE[l.id] && WA_PRACTICE[l.id].recall.length >= 2))));
+  check('the business lesson separates revenue from profit', await page.evaluate(() => {
+    const l = WA_CONTENT.modules.find(m => m.id === 'merchant')
+      .lessons.find(x => x.id === 'merchant-3');
+    const all = l.body.join(' ') + l.keyPoints.join(' ');
+    return /break-even/i.test(all) && /ABN/.test(all) && /75,000/.test(all);
+  }));
+
+  await page.goto(APP + '#/course');
+  await page.waitForSelector('.card--module');
+  await dismiss(page);
+  check('the course page separates optional from the main path',
+    /If you want it/i.test(await page.textContent('#view') || await page.textContent('body')));
+
+  /* ---------- the tally: her scales, her ledger ---------- */
+  await page.goto(APP + '#/kit/tally');
+  await page.waitForSelector('#tallyAdd');
+  await dismiss(page);
+  check('an empty pile says so', /Nothing weighed in/.test(await page.textContent('#kitBody')));
+
+  await page.click('#tallyAdd');
+  await page.waitForSelector('#tlSave');
+  await page.selectOption('#tlMetal', 'copper');
+  await page.fill('#tlKg', '34');
+  await page.click('#tlSave');
+  await page.waitForSelector('.tally-line');
+  check('weighing something in adds it to the pile',
+    await page.evaluate(() => WA_TALLY.totals()[0].metal === 'copper' && WA_TALLY.totals()[0].kg === 34));
+
+  // The pairing is the whole point: what it is worth, and what she will get.
+  check('the pile is valued at spot AND at what a yard pays', await page.evaluate(() => {
+    WA_MARKET.state.prices.copper = { usd: 4.2 };
+    WA_MARKET.state.usdAud = 1.5;
+    const v = WA_TALLY.valuePile();
+    const l = v.lines[0];
+    return l.known && l.spot > 0 && l.yardLow < l.spot && l.yardHigh < l.spot && l.yardLow < l.yardHigh;
+  }));
+  check('a metal with no price says so rather than guessing', await page.evaluate(() => {
+    delete WA_MARKET.state.prices.copper;
+    WA_MARKET.state.usdAud = null;
+    const l = WA_TALLY.valueOf('copper', 10);
+    return l.known === false;
+  }));
+  check('estimated prices are flagged as estimates', await page.evaluate(() => {
+    const s = WA_TALLY.spotPerKg('steel');
+    return s && s.live === false;      // no live feed for steel; must not claim one
+  }));
+
+  // Fuel against the load is what turns revenue into profit.
+  await page.click('#tallyTrip');
+  await page.waitForSelector('#tlTripSave');
+  await page.fill('#tlKm', '120');
+  await page.click('#tlTripSave');
+  await page.waitForSelector('.tally-costs');
+  check('a run out is costed against the load',
+    await page.evaluate(() => WA_TALLY.tripCost() > 0));
+  check('the screen shows what is actually hers after costs',
+    /actually yours/.test(await page.textContent('.tally-costs')));
+
+  check('Old Mate can say the pile out loud', await page.evaluate(() => {
+    WA_MARKET.state.prices.copper = { usd: 4.2 };
+    WA_MARKET.state.usdAud = 1.5;
+    const s = WA_TALLY.spoken();
+    return /34 kilos of copper/.test(s) && /at spot/.test(s) && /expect/.test(s);
+  }));
+
+  await page.click('#tallySell');
+  await page.waitForSelector('#tlSold');
+  await page.fill('#tlPaid', '450');
+  await page.click('#tlSold');
+  await page.waitForTimeout(300);
+  check('selling banks the load and clears the pile', await page.evaluate(() =>
+    WA_TALLY.pile().length === 0 && WA_TALLY.history().length === 1));
+  check('the ledger records paid, costs and what she actually made', await page.evaluate(() => {
+    const l = WA_TALLY.history()[0];
+    return l.paid === 450 && l.costs > 0 && l.profit === 450 - l.costs;
+  }));
+  check('and how she did against spot across every load', await page.evaluate(() => {
+    const life = WA_TALLY.lifetime();
+    return life.loads === 1 && life.ratio > 0 && life.ratio < 1;
+  }));
+  await dismiss(page);
+  await shot(page, '21-tally.png');
+
+  /* ---------- what's in this thing ---------- */
+  await page.goto(APP + '#/kit/teardown');
+  await page.waitForSelector('.tile-btn[data-tile^="td:"]');
+  await dismiss(page);
+  check('the teardown catalogue is there',
+    (await page.locator('.tile-btn[data-tile^="td:"]').count()) === 12);
+  check('every tile leads with the verdict',
+    /Strip it|Sell it whole|Leave it/.test(await page.textContent('.tile-btn[data-tile^="td:"] .tile-s')));
+
+  await page.click('.tile-btn[data-tile="td:alternator"]');
+  await page.waitForSelector('.sheet.is-open .td-verdict');
+  check('an entry commits to an answer', (await page.locator('.td-verdict').count()) === 1);
+  check('and gives her a way to remember it', (await page.locator('.td-hook b').count()) === 1);
+  await page.click('.sheet-x');
+  await page.waitForSelector('.sheet', { state: 'detached' });
+
+  // The genuinely hazardous ones say so, in the same voice as everything else.
+  await page.click('.tile-btn[data-tile="td:ewaste-board"]');
+  await page.waitForSelector('.sheet.is-open');
+  const gold = await page.textContent('.sheet-body');
+  check('gold recovery teaches the safe way to realise it',
+    /connectors|pins/i.test(gold) && /refiner/i.test(gold), { gold: gold.slice(0, 200) });
+  check('and is straight about the chemistry rather than walking her through it',
+    /acid/i.test(gold) && /not going to walk you through/i.test(gold));
+  check('hazards are shown as warnings, not buried in bullets',
+    (await page.locator('.td-danger').count()) === 1);
+  await shot(page, '22-teardown.png');
+  await page.click('.sheet-x');
+  await page.waitForSelector('.sheet', { state: 'detached' });
+
+  check('refrigerant work is named as licensed', await page.evaluate(() =>
+    /licensed/i.test(WA_TEARDOWN.byId('compressor').danger)));
+  check('burning insulation is called out as illegal', await page.evaluate(() =>
+    WA_TEARDOWN.byId('loom').notes.some(n => /never burn/i.test(n))));
+
+  /* ---------- ask old mate in her own words ---------- */
+  await page.goto(APP + '#/doctor');
+  await page.waitForSelector('#askBox');
+  await dismiss(page);
+  check('the corpus covers the whole app', await page.evaluate(() => WA_ASK.docCount() > 80));
+
+  const asked = await page.evaluate(async () => {
+    const q = (s) => WA_ASK.offline(s);
+    return {
+      holes: q('why is my weld full of little holes').answers[0].title,
+      warp: q('how do I stop it warping').answers[0].title,
+      crack: q('why did it crack days later').answers[0].title,
+      groove: q('there is a groove along the edge of my weld').answers[0].title,
+      burn: q('I blew a hole right through it').answers[0].title,
+      wear: q('what do I need to wear').answers[0].title,
+      nonsense: q('how do I make a lasagne').ok,
+      nonsenseText: q('how do I make a lasagne').answers[0].text
+    };
+  });
+  check('plain words find the right fault: holes → porosity', /porosity/i.test(asked.holes), asked);
+  check('plain words find the right fault: warping → distortion', /distortion/i.test(asked.warp), asked);
+  check('plain words find the right fault: late crack → cold cracking', /cold cracking/i.test(asked.crack), asked);
+  check('plain words find the right fault: groove → undercut', /undercut/i.test(asked.groove), asked);
+  check('plain words find the right fault: blew through → burn-through', /burn/i.test(asked.burn), asked);
+  check('a topic question finds the lesson', /dressing/i.test(asked.wear), asked);
+
+  // The rule the whole thing is built on.
+  check('he says so rather than guessing', !asked.nonsense, asked);
+  check('and says it plainly, without inventing welding advice',
+    /not in what I have been taught|not going to.*guess/i.test(asked.nonsenseText), asked);
+
+  check('a price question is answered from the price data', await page.evaluate(() => {
+    WA_MARKET.state.rows = null;
+    const r = WA_ASK.offline("what's copper running at");
+    return r.answers[0].kind === 'price' && /copper/i.test(r.answers[0].text);
+  }));
+  check('price questions are recognised however she phrases them', await page.evaluate(() =>
+    WA_ASK.looksLikePrice("what's gold worth") === 'gold' &&
+    WA_ASK.looksLikePrice('how much is copper per kilo') === 'copper' &&
+    WA_ASK.looksLikePrice('how do I weld copper') === null));
+
+  /* ---------- sync (optional): off by default, safe when unreachable ---- */
+  check('sync is off unless a server and code are both set',
+    await page.evaluate(() => !WA_SYNC.isConfigured()));
+  check('pushing with nothing configured is a no-op, not an error', await page.evaluate(async () => {
+    const r = await WA_SYNC.push();
+    return r.ok === false && r.reason === 'not configured';
+  }));
+  check('an unreachable server fails softly rather than throwing', await page.evaluate(async () => {
+    WA_SYNC.save({ url: 'http://127.0.0.1:1', code: 'nope', auto: false });
+    const push = await WA_SYNC.push();
+    const pull = await WA_SYNC.pull();
+    WA_SYNC.save({ url: '', code: '', auto: false });
+    return push.ok === false && pull.ok === false;   // never throws, always resolves
+  }));
+  check('nothing here writes to progress unless a pull is explicitly applied',
+    await page.evaluate(() => !WA_PROGRESS.settings().sync || !WA_PROGRESS.settings().sync.url));
+
+  check('the AI upgrade is off unless she sets a key',
+    await page.evaluate(() => !WA_ASK.isConfigured() && WA_ASK.providerName() === 'Off'));
+  check('with no key it still answers, offline', await page.evaluate(async () => {
+    const r = await WA_ASK.answer('why is my weld full of little holes');
+    return r.source === 'offline' && r.ok;
+  }));
+  // Deliberately break it and prove it still answers. The failed request logs
+  // a console error by design, so this test's own noise is discounted from the
+  // page-error check below rather than the check being loosened — a real error
+  // anywhere else in the run still fails the suite.
+  const errorsBeforeBadKey = errors.length;
+  check('a broken AI key falls back rather than failing', await page.evaluate(async () => {
+    WA_ASK.save({ provider: 'custom', url: 'https://127.0.0.1:9/never', key: 'not-a-real-key' });
+    const r = await WA_ASK.answer('why is my weld full of little holes');
+    WA_ASK.save({ provider: 'off' });
+    return r.source === 'offline' && r.ok;      // never throws, never blank
+  }));
+  const expectedFailureNoise = errors.length - errorsBeforeBadKey;
+  errors.length = errorsBeforeBadKey;
+
+  // The provider list must not offer anything a browser cannot actually reach.
+  // OpenAI's API sends no CORS headers, so a direct call is blocked before it
+  // leaves the phone — an option that can never work is worse than no option.
+  await page.goto(APP + '#/settings');
+  await page.waitForSelector('#chatProvider');
+  await dismiss(page);
+  check('no provider is offered that a browser would block', await page.evaluate(() =>
+    [...document.querySelectorAll('#chatProvider option')].every(o => o.value !== 'openai')));
+  check('the providers offered can actually reach their API', await page.evaluate(() => {
+    const opts = [...document.querySelectorAll('#chatProvider option')].map(o => o.value);
+    return opts.includes('anthropic') && opts.includes('custom') && opts.includes('off');
+  }));
+
+  // The whole round trip through the UI. Back to Old Mate — the provider
+  // assertions above navigated to Settings.
+  await page.goto(APP + '#/doctor');
+  await page.waitForSelector('#askBox');
+  await dismiss(page);
+  await page.fill('#askBox', 'why is my weld full of little holes');
+  await page.click('#askGo');
+  await page.waitForSelector('.ask-answer');
+  check('asking through the box shows an answer',
+    (await page.textContent('.ask-answer')).length > 40);
+  check('the answer points at where it came from',
+    (await page.locator('.ask-src').count()) === 1);
+  await shot(page, '20-ask.png');
+
   /* ---------- drive mode ---------- */
   await page.goto(APP + '#/drive');
   await page.waitForSelector('.tile-btn[data-tile^="drive:"]');
@@ -427,6 +694,124 @@ function check(name, cond, extra) {
   check('every lesson listened to is credited, including the last',
     drive.credited === drive.lessons, drive);
   check('finishing clears the resume point', drive.resumeCleared, drive);
+
+  /* ---------- the collection, and the bits from Mick ---------- */
+  await page.goto(APP + '#/dolls');
+  await page.waitForSelector('.doll-cell');
+  await dismiss(page);
+  check('the whole set is shown, earned or not',
+    (await page.locator('.doll-cell').count()) === await page.evaluate(() => WA_DOLLS.dolls.length));
+  check('unearned ones are silhouettes with no name given', await page.evaluate(() => {
+    const locked = [...document.querySelectorAll('.doll-cell.is-locked')];
+    return locked.length > 0 && locked.every(c => c.querySelector('.doll-name').textContent === '???');
+  }));
+  check('every doll can actually be earned by something', await page.evaluate(() =>
+    WA_DOLLS.dolls.every(d => {
+      const [kind, arg] = d.how.split(':');
+      if (kind === 'module') return WA_CONTENT.modules.some(m => m.id === arg);
+      return ['streak', 'drills', 'badges'].includes(kind) && Number(arg) > 0;
+    })));
+  check('there is always a next one to want', await page.evaluate(() => {
+    const n = WA_DOLLS.nextUp();
+    return n && n.hint.length > 3;
+  }));
+  check('it is honest about being a collection, not a game',
+    /not a game to play/i.test(await page.textContent('#view')));
+
+  // Finishing the first unit is what unlocks the first doll.
+  check('finishing a unit unlocks its doll', await page.evaluate(() => {
+    WA_PROGRESS.setSetting('dolls', []);
+    const mod = WA_CONTENT.modules.find(m => m.id === 'safety');
+    mod.lessons.forEach(l => { WA_PROGRESS.state.lessons[l.id] = true; });
+    const fresh = WA_DOLLS.check();
+    return fresh.some(d => d.id === 'arc') && WA_DOLLS.has('arc');
+  }));
+  check('and it only unlocks once', await page.evaluate(() => WA_DOLLS.check().length === 0));
+  await page.goto(APP + '#/dolls');
+  await page.waitForSelector('.doll-cell');
+  await dismiss(page);
+  await shot(page, '25-dolls.png');
+
+  // The personal bits: hooks with placeholder content, all in one file.
+  check('the unicorn is on the last tile of the first unit only', await page.evaluate(() => {
+    const m = WA_CONTENT.modules.find(x => x.id === 'safety');
+    const last = m.lessons[m.lessons.length - 1].id;
+    const first = m.lessons[0].id;
+    return WA_PERSONAL.isUnicornLesson('safety', last) &&
+      !WA_PERSONAL.isUnicornLesson('safety', first) &&
+      !WA_PERSONAL.isUnicornLesson('smaw', last);
+  }));
+  check('the hidden note needs a deliberate long press, not a tap', await page.evaluate(() =>
+    WA_PERSONAL.HOLD_MS >= 500 && WA_PERSONAL.HOLDS_NEEDED >= 3));
+
+  // It must be findable, so the press-and-hold is exercised for real.
+  await page.goto(APP + '#/home');
+  await page.waitForSelector('#heroHi');
+  await dismiss(page);
+  const box = await page.locator('#heroHi').boundingBox();
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(820);
+    await page.mouse.up();
+    await page.waitForTimeout(60);
+  }
+  await page.waitForSelector('.note', { timeout: 3000 }).catch(() => {});
+  check('three long presses on her name open the note',
+    (await page.locator('.note').count()) === 1);
+  check('the note leaves no trace in saved progress', await page.evaluate(() =>
+    !JSON.stringify(WA_PROGRESS.state).toLowerCase().includes('unicorn') &&
+    WA_PROGRESS.settings().note === undefined));
+  await shot(page, '26-note.png');
+  await page.click('.note-x');
+  await page.waitForTimeout(320);
+  check('and it closes cleanly', (await page.locator('.note').count()) === 0);
+
+  /* ---------- where this comes from ---------- */
+  await page.goto(APP + '#/sources');
+  await page.waitForSelector('.src');
+  await dismiss(page);
+  check('every source is a real tappable link, not a name in prose',
+    (await page.locator('.src[href^="https://"]').count()) >= 8);
+  check('links open away from the app', await page.evaluate(() =>
+    [...document.querySelectorAll('.src')].every(a =>
+      a.target === '_blank' && /noopener/.test(a.rel))));
+  check('no placeholder or search-page links', await page.evaluate(() =>
+    WA_SOURCES.sources.every(s => !/example\.com|TODO|\?q=|\/search/i.test(s.url))));
+  check('the standards behind the strongest claim are there', await page.evaluate(() => {
+    const ids = WA_SOURCES.sources.map(s => s.id);
+    return ids.includes('iarc') && ids.includes('as1338') && ids.includes('as1554-1');
+  }));
+  check('it says plainly that an AI wrote this', await page.evaluate(() =>
+    WA_SOURCES.statement.some(p => /written by an AI/i.test(p))));
+  check('and lists where the app is estimating rather than citing',
+    (await page.locator('#view').textContent()).includes('Where this app is estimating'));
+  check('estimates cover the guessy bits by name', await page.evaluate(() => {
+    const all = WA_SOURCES.estimates.map(e => e.what.toLowerCase()).join(' | ');
+    return /amperage/.test(all) && /scrap/.test(all) && /yard pays/.test(all);
+  }));
+  await shot(page, '23-sources.png');
+
+  // The claim attached to the content, not buried three taps away.
+  await page.goto(APP + '#/module/safety');
+  await page.waitForSelector('.checked');
+  await dismiss(page);
+  check('a unit shows what it was checked against',
+    (await page.locator('.checked a[href^="https://"]').count()) >= 1);
+
+  /* ---------- the honest path to a ticket ---------- */
+  await page.goto(APP + '#/ticket');
+  await page.waitForSelector('.card--portfolio');
+  await dismiss(page);
+  const ticket = await page.textContent('#view');
+  check('it says outright that the app does not certify her', /does not certify/i.test(ticket));
+  check('it explains RPL rather than just naming it', /registered training organisation/i.test(ticket));
+  check('the portfolio counts the evidence she has been collecting',
+    (await page.locator('.port-row').count()) >= 5);
+  check('it names what an assessor actually wants', /cut-and-etched|bend test/i.test(ticket));
+  check('and makes no promises about time or cost',
+    /No promises on time or cost/i.test(ticket));
+  await shot(page, '24-ticket.png');
 
   /* ---------- settings, sound + AI plumbing ---------- */
   await page.goto(APP + '#/settings');
@@ -592,7 +977,10 @@ function check(name, cond, extra) {
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check('no horizontal overflow at 1180px', wideOverflow <= 0, { wideOverflow });
 
-  check('no page errors', errors.length === 0, errors.slice(0, 5));
+  // Only the deliberate broken-key request above is discounted, and it is
+  // reported so a silently growing pile of "expected" noise stays visible.
+  check('no page errors', errors.length === 0,
+    { errors: errors.slice(0, 5), discountedFromTheBadKeyTest: expectedFailureNoise });
   check('offline price failure is handled, not thrown',
     await page.evaluate(async () => {
       const r = await WA_MARKET.refresh({ force: true });

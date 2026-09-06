@@ -42,3 +42,17 @@ jobs:
 
       - name: End-to-end smoke test
         run: node tools/e2e-smoke.cjs
+
+      # The optional server (server/index.js) has zero npm dependencies of its
+      # own — only Node's built-ins — so there is nothing extra to install.
+      - name: Server tests
+        run: node tools/test-server.mjs
+
+      - name: Two-device sync integration test
+        run: node tools/test-sync-integration.mjs
+
+      # The sources page exists so its claims can be checked, so a dead link on
+      # it is a real defect. Sites that block scripted requests are reported as
+      # unverified rather than failing the build.
+      - name: Check the source links still resolve
+        run: node tools/check-links.mjs

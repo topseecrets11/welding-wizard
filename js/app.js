@@ -27,6 +27,11 @@
   var MK = window.WA_MARKET;
   var PF = window.WA_PROFILE;
   var DR = window.WA_DRIVE;
+  var TL = window.WA_TALLY;
+  var TD = window.WA_TEARDOWN;
+  var DL = window.WA_DOLLS;
+  var PERSONAL = window.WA_PERSONAL;
+  var SY = window.WA_SYNC;
 
   var view, header, tabbar, toastHost;
   var autoReadTimer = null;        // pending auto-start of the reader
@@ -188,6 +193,38 @@
       });
     });
 
+    /* Finishing a whole unit is a bigger moment than finishing a lesson, so it
+       gets the Mick celebration rather than another badge card. */
+    if (result.moduleComplete) {
+      var mod = moduleById(result.moduleComplete);
+      J.celebrate({
+        kind: 'complete',
+        character: 'mick',
+        icon: '💰',
+        kicker: 'Unit complete',
+        title: mod ? mod.title : 'Unit done',
+        subtitle: PF.line('unit'),
+        note: PERSONAL.unitNote(result.moduleComplete),
+        button: 'Cheers'
+      });
+    }
+
+    /* Anything above may have completed a doll's condition. */
+    DL.check().forEach(function (d) {
+      J.celebrate({
+        kind: 'badge',
+        art: DL.svg(d, { width: 96, suffix: 'cel' }),
+        kicker: 'Collection',
+        title: d.name,
+        subtitle: 'One more for the set. ' + DL.progress().have + ' of ' + DL.progress().total + '.',
+        note: (function () {
+          var n = DL.nextUp();
+          return n ? 'Next one: ' + n.hint + '.' : 'That is the whole set.';
+        })(),
+        button: 'Have a look'
+      });
+    });
+
     renderHeader();
   }
 
@@ -280,7 +317,10 @@
            ['#/kit/checklist', '✅', 'Pre-flight checklist', 'Before the helmet goes down'],
            ['#/kit/sheets', '📋', 'Cheat sheets', 'Amps, volts, gas, sizes'],
            ['#/kit/log', '📓', 'Weld log', 'Your own record'],
-           ['#/kit/scrap', '💰', 'Scrap & prices', 'What metal is worth today']
+           ['#/kit/scrap', '💰', 'Prices', 'What metal is worth today'],
+           ['#/kit/tally', '⚖️', 'My pile', 'What is on your scales, and what it is worth'],
+           ['#/kit/teardown', '🔩', 'Worth stripping?', 'What is inside it, and is it worth the hour'],
+           ['#/drive', '🚗', 'Drive Mode', 'A whole unit read out loud']
           ].map(function (r) {
             return '<a class="drawer-item" href="' + r[0] + '">' +
               '<span class="drawer-ico">' + r[1] + '</span>' +
@@ -290,6 +330,10 @@
           '<div class="drawer-sec">Yours</div>' +
           '<a class="drawer-item" href="#/home"><span class="drawer-ico">🗺️</span>' +
             '<span class="drawer-txt"><b>The map</b><i>Progress, badges, daily challenge</i></span></a>' +
+          '<a class="drawer-item" href="#/ticket"><span class="drawer-ico">🎓</span>' +
+            '<span class="drawer-txt"><b>Getting the ticket</b><i>What counts, and how RPL works</i></span></a>' +
+          '<a class="drawer-item" href="#/sources"><span class="drawer-ico">📚</span>' +
+            '<span class="drawer-txt"><b>Where this comes from</b><i>Every source, linked — check it yourself</i></span></a>' +
           '<a class="drawer-item" href="#/settings"><span class="drawer-ico">⚙️</span>' +
             '<span class="drawer-txt"><b>Settings</b><i>Voice, sound, AI scan, reset</i></span></a>' +
         '</div>' +
@@ -498,13 +542,26 @@
       (lead === 'badges' ? badgesHtmlBlock : '') +
       '<h2 class="section-h">The road to a ticket</h2>' +
       '<div class="map">' + mapHtml() + '</div>' +
+      optionalHtml() +
+      collectionHtml() +
       (lead === 'badges' ? '' : badgesHtmlBlock) +
       '<div class="footer-note">' +
-        '<p>Weld Academy teaches the knowledge, not the ticket. When you want the paper, that is TAFE and a coded test on a real coupon — you will walk in already knowing the job.</p>' +
+        '<p>Weld Academy teaches the knowledge, not the ticket. When you want the paper, that is an RTO and a coded test on a real coupon — and you will walk in already knowing the job.</p>' +
+        '<p>Written by an AI, built on published standards, and <a href="#/sources">every source is linked</a> so you can check any of it yourself.</p>' +
+        '<a class="btn btn--ghost btn--sm" href="#/ticket">Getting the ticket</a> ' +
+        '<a class="btn btn--ghost btn--sm" href="#/sources">Sources</a> ' +
         '<a class="btn btn--ghost btn--sm" href="#/settings">Settings</a>' +
       '</div>';
 
     wireDaily();
+    view.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-tile^="opt:"]');
+      if (btn) go('#/module/' + btn.getAttribute('data-tile').split(':')[1]);
+    });
+
+    /* Nothing on screen points at this. Press and hold her name, three times.
+       Not spoken, not logged, not written down anywhere. */
+    PERSONAL.attachHiddenNote($('#heroHi'), openHiddenNote);
     paintTicker();
     afterPaint(function () { MK.refresh().then(paintTicker); });
   }
@@ -608,8 +665,44 @@
     }
   }
 
+  /* The dolls she has, nested the way the real things sit — biggest outside,
+     smallest hidden inside. Unearned ones show as silhouettes so there is
+     always a visible next one. */
+  function collectionHtml() {
+    var p = DL.progress();
+    var next = DL.nextUp();
+    return '<a class="collection" href="#/dolls">' +
+      '<div class="collection-row">' +
+        DL.dolls.map(function (d) {
+          return DL.svg(d, { width: 42, locked: !DL.has(d.id), suffix: 'home' });
+        }).join('') +
+      '</div>' +
+      '<div class="collection-meta">' +
+        '<b>🪆 The collection · ' + p.have + ' of ' + p.total + '</b>' +
+        '<i>' + (next ? esc(next.hint) + ' for the next one' : 'Complete set') + '</i>' +
+      '</div>' +
+    '</a>';
+  }
+
+  /* The optional units, offered rather than pushed. Anything in here is real
+     and useful, but leading with it at someone who has not asked reads as a
+     lecture — so it sits under the map, clearly marked, and stays shut until
+     she goes looking. */
+  function optionalHtml() {
+    var opt = C.modules.filter(function (m) { return m.tier === 'advanced'; });
+    if (!opt.length) return '';
+    return '<h2 class="section-h">If you want it</h2>' +
+      tiles(opt.map(function (m) {
+        var pct = P.modulePercent(m.id);
+        return { key: 'opt:' + m.id, icon: m.icon, title: m.title,
+                 sub: pct ? pct + '% done · optional' : m.lessons.length + ' lessons · optional' };
+      }));
+  }
+
+  /* The road to a ticket. Optional units are deliberately not on it — they get
+     their own tile underneath, so the main path stays the main path. */
   function mapHtml() {
-    return C.modules.map(function (m, i) {
+    return C.modules.filter(function (m) { return m.tier !== 'advanced'; }).map(function (m, i) {
       var pct = P.modulePercent(m.id);
       var prof = P.proficiency(m.id);
       var unlocked = P.moduleUnlocked(m.id);
@@ -712,7 +805,10 @@
     renderTabs('course');
     var tiers = [
       { id: 'core', title: 'Core units', sub: 'Get proficient in each process' },
-      { id: 'mastery', title: 'Mastery units', sub: 'Go past competent — the knowledge that separates trades from hobbyists' }
+      { id: 'mastery', title: 'Mastery units', sub: 'Go past competent — the knowledge that separates trades from hobbyists' },
+      // Optional, and said so plainly. Nothing here is needed for the welding,
+      // and it is not put in front of her as though it were.
+      { id: 'advanced', title: 'If you want it', sub: 'Optional. Not needed for any of the above — here for when you feel like going deeper' }
     ];
 
     view.innerHTML =
@@ -790,7 +886,25 @@
         '<div class="quiz-icon">🎯</div>' +
         '<div><h3>Checkpoint quiz</h3><p>' + esc(quizStatus) + '</p></div>' +
         '<div class="quiz-go">›</div>' +
-      '</a>';
+      '</a>' +
+      checkedAgainstHtml(m);
+  }
+
+  /* The claim attached to the content rather than buried three taps away: what
+     this particular unit is built on, with the links right there. */
+  function checkedAgainstHtml(m) {
+    var S = window.WA_SOURCES;
+    if (!S) return '';
+    var hits = S.byUnit(m.id);
+    if (!hits.length) return '<p class="checked"><a href="#/sources">Where all of this comes from →</a></p>';
+    return '<div class="checked">' +
+      '<b>Checked against</b>' +
+      hits.map(function (s) {
+        return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' +
+          esc(s.title) + ' ↗</a>';
+      }).join('') +
+      '<a class="checked-all" href="#/sources">All sources →</a>' +
+    '</div>';
   }
 
   /* ============================ lesson + modes ========================== */
@@ -857,6 +971,20 @@
 
     $('#doneBtn').addEventListener('click', function (e) {
       var res = P.completeLesson(m.id, l.id);
+
+      /* One wink, in one place: the tile that closes out her very first unit.
+         It goes ahead of the standard celebrations so it lands first. */
+      if (res.xp && PERSONAL.isUnicornLesson(m.id, l.id)) {
+        J.celebrate({
+          kind: 'complete',
+          character: 'unicorn',
+          icon: PERSONAL.unicorn().emoji,
+          kicker: 'First unit done',
+          title: PERSONAL.unicorn().line,
+          button: '🦄'
+        });
+      }
+
       announce(res, { from: e.currentTarget });
       var nextHref = isLast ? '#/quiz/' + m.id : '#/lesson/' + m.id + '/' + m.lessons[idx + 1].id;
       setTimeout(function () { go(nextHref); }, res.xp ? 420 : 0);
@@ -1221,7 +1349,9 @@
         '<div><h1>Ask Old Mate</h1>' +
         '<p>Been welding since before you were born. Tell him what you can see, hear or remember — you do not need to know the names, that is his end.</p></div>' +
       '</div>' +
+      askCardHtml() +
       (V.isConfigured() ? cameraCardHtml() : '') +
+      '<h2 class="section-h">Or tick what you can see</h2>' +
       '<div id="clueHost">' + cluesHtml + '</div>' +
       '<div class="doctor-actions">' +
         '<button class="btn btn--primary btn--big" id="dxBtn">Diagnose it →</button>' +
@@ -1256,6 +1386,7 @@
       showDiagnosis(Object.keys(doctorPicks));
     });
 
+    wireAsk();
     if (V.isConfigured()) wireCamera();
   }
 
@@ -1267,6 +1398,105 @@
       '</label>' +
       '<div id="scanResult"></div>' +
     '</div>';
+  }
+
+  /* ---- ask him in her own words ---- */
+
+  function speechRecognition() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    return SR ? new SR() : null;
+  }
+
+  function askCardHtml() {
+    var canHear = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    return '<div class="card card--ask">' +
+      '<div class="ask-row">' +
+        '<input class="input ask-input" id="askBox" type="text" autocomplete="off" ' +
+          'placeholder="Why is my weld full of little holes?">' +
+        (canHear ? '<button class="ask-mic" id="askMic" aria-label="Ask out loud">🎤</button>' : '') +
+      '</div>' +
+      '<button class="btn btn--primary" id="askGo">Ask him</button>' +
+      '<div id="askOut"></div>' +
+    '</div>';
+  }
+
+  function renderAnswer(res) {
+    var host = $('#askOut');
+    if (!host) return;
+
+    var first = res.answers[0];
+    host.innerHTML =
+      '<div class="ask-answer' + (res.ok ? '' : ' is-stumped') + '">' +
+        '<p class="ask-text">' + esc(first.text) + '</p>' +
+        (first.href ? '<a class="ask-src" href="' + first.href + '">' +
+          (first.title ? esc(first.title) : 'Read it properly') +
+          (first.where ? ' · ' + esc(first.where) : '') + ' →</a>' : '') +
+        (res.source === 'ai' ? '<span class="ask-badge">answered by ' + esc(WA_ASK.providerName()) +
+          ', from the app\'s own notes</span>' : '') +
+      '</div>' +
+      ((res.also || res.answers.slice(1)).length
+        ? '<div class="ask-more"><b>He also reckons these are related</b>' +
+          tiles((res.also || res.answers.slice(1)).map(function (a, i) {
+            return { key: 'askmore:' + i, icon: '📖', title: a.title || 'Related', sub: a.where };
+          })) + '</div>'
+        : '');
+
+    // Read it back, because half the time she is not looking at the screen.
+    if (N.supported()) {
+      N.setScript([{ text: first.text }]);
+      N.play(0);
+    }
+
+    var more = (res.also || res.answers.slice(1));
+    var moreHost = host.querySelector('.ask-more');
+    if (moreHost) {
+      moreHost.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-tile^="askmore:"]');
+        if (!btn) return;
+        var a = more[+btn.getAttribute('data-tile').split(':')[1]];
+        if (!a) return;
+        openSheet(a.title || 'Related',
+          '<p>' + esc(a.text) + '</p>' +
+          (a.href ? '<a class="btn btn--primary" href="' + a.href + '">Open it →</a>' : ''));
+      });
+    }
+  }
+
+  function askHim(question) {
+    question = (question || '').trim();
+    if (!question) { toast('Ask him something first.', 'warn'); return; }
+    var host = $('#askOut');
+    host.innerHTML = '<div class="ask-thinking"><span class="scan-bar"></span>Having a think…</div>';
+    WA_ASK.answer(question).then(renderAnswer);
+  }
+
+  function wireAsk() {
+    var box = $('#askBox');
+    if (!box) return;
+    $('#askGo').addEventListener('click', function () { tap(); askHim(box.value); });
+    box.addEventListener('keydown', function (e) { if (e.key === 'Enter') askHim(box.value); });
+
+    var mic = $('#askMic');
+    if (!mic) return;
+    mic.addEventListener('click', function () {
+      var rec = speechRecognition();
+      if (!rec) return;
+      rec.lang = 'en-AU';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      mic.classList.add('is-live');
+      tap();
+      rec.onresult = function (e) {
+        var said = e.results[0][0].transcript;
+        box.value = said;
+        askHim(said);
+      };
+      rec.onerror = function () {
+        toast('Did not catch that — type it instead.', 'warn');
+      };
+      rec.onend = function () { mic.classList.remove('is-live'); };
+      try { rec.start(); } catch (err) { mic.classList.remove('is-live'); }
+    });
   }
 
   function wireCamera() {
@@ -1412,12 +1642,16 @@
       { id: 'checklist', label: '✅ Pre-flight' },
       { id: 'sheets', label: '📋 Cheat sheets' },
       { id: 'log', label: '📓 Weld log' },
-      { id: 'scrap', label: '💰 Scrap & prices' }
+      { id: 'scrap', label: '💰 Prices' },
+      { id: 'tally', label: '⚖️ My pile' },
+      { id: 'teardown', label: '🔩 Worth stripping?' }
     ];
 
     var body = tab === 'sheets' ? kitSheets()
              : tab === 'log' ? kitLog()
              : tab === 'scrap' ? kitScrap()
+             : tab === 'tally' ? kitTally()
+             : tab === 'teardown' ? kitTeardown()
              : kitChecklist();
 
     view.innerHTML =
@@ -1432,6 +1666,7 @@
     if (tab === 'checklist') wireChecklist();
     if (tab === 'log') wireLog();
     if (tab === 'scrap') wireScrap();
+    if (tab === 'tally') wireTally();
 
     // One delegated handler for every tile on this page.
     $('#kitBody').addEventListener('click', function (e) {
@@ -1441,6 +1676,203 @@
       if (parts[0] === 'scrap') openScrapSheet(+parts[1]);
       else if (parts[0] === 'cheat') openCheatSheet(+parts[1]);
       else if (parts[0] === 'check') openCheckSheet(+parts[1]);
+      else if (parts[0] === 'td') openTeardownSheet(parts[1]);
+    });
+  }
+
+  /* ---- what's in this thing? ---- */
+
+  function kitTeardown() {
+    return '<p class="page-sub">Someone has handed you an alternator. Is it worth the hour? ' +
+      'Every one of these ends with the same call: strip it, sell it whole, or leave it.</p>' +
+      tiles(TD.items.map(function (it) {
+        var v = TD.verdict(it.verdict);
+        return { key: 'td:' + it.id, icon: it.icon, title: it.name, sub: v.icon + ' ' + v.label };
+      })) +
+      '<div class="card card--warn">' +
+        '<b>These are ranges, not promises</b>' +
+        '<p>A big truck alternator and a little Japanese one are different animals, and prices ' +
+        'move. Weigh what you actually get and keep your own notes in the tally — after a few ' +
+        'loads yours will beat any table.</p>' +
+      '</div>';
+  }
+
+  function openTeardownSheet(id) {
+    var it = TD.byId(id);
+    if (!it) return;
+    var v = TD.verdict(it.verdict);
+    openSheet(it.icon + ' ' + it.name,
+      '<div class="td-verdict ' + v.cls + '">' + v.icon + ' ' + esc(v.label) + '</div>' +
+      '<p>' + esc(it.plain) + '</p>' +
+      '<div class="td-hook"><span>Remember it as</span><b>' + esc(it.hook) + '</b></div>' +
+      '<div class="dx-sec"><b>What is in it</b><p>' + esc(it.metals) + '</p></div>' +
+      '<div class="dx-sec"><b>What it takes</b><p>About ' + it.time + ' minutes once you have ' +
+        'done a few. ' + esc(it.tools) + '</p></div>' +
+      '<div class="dx-sec dx-sec--fix"><b>' + esc(v.label) + '</b><p>' + esc(it.verdictWhy) + '</p></div>' +
+      (it.danger ? '<div class="td-danger"><b>⚠️ Read this bit</b><p>' + esc(it.danger) + '</p></div>' : '') +
+      '<div class="dx-sec"><b>Worth knowing</b><ul>' +
+        it.notes.map(function (nn) { return '<li>' + esc(nn) + '</li>'; }).join('') + '</ul></div>');
+  }
+
+  /* ---- her scales, her ledger ---- */
+
+  function money(n) {
+    return '$' + Math.round(n).toLocaleString('en-AU');
+  }
+
+  function kitTally() {
+    var v = TL.valuePile();
+    var costs = TL.tripCost();
+    var life = TL.lifetime();
+
+    var pileHtml = v.lines.length
+      ? '<div class="tally-lines">' + v.lines.map(function (l) {
+          return '<div class="tally-line">' +
+            '<span class="tally-ico">' + l.icon + '</span>' +
+            '<span class="tally-metal"><b>' + esc(l.label) + '</b>' +
+              '<i>' + (Math.round(l.kg * 10) / 10) + ' kg</i></span>' +
+            '<span class="tally-val">' +
+              (l.known
+                ? '<b>' + money(l.yardLow) + '–' + money(l.yardHigh) + '</b>' +
+                  '<i>' + money(l.spot) + ' at spot' + (l.live ? '' : ' · estimate') + '</i>'
+                : '<i>no price</i>') +
+            '</span>' +
+          '</div>';
+        }).join('') + '</div>'
+      : '<p class="muted">Nothing weighed in yet. Add what is on your scales.</p>';
+
+    return '<p class="page-sub">What you are sitting on, valued two ways — because the ' +
+      'number on the world market and the number a yard hands you are not the same, and ' +
+      'the gap is the business.</p>' +
+
+      '<div class="card card--tally">' +
+        '<div class="tally-head">' +
+          '<div><span class="tally-kicker">Yard would pay</span>' +
+            '<span class="tally-big">' + (v.total.spot
+              ? money(v.total.yardLow) + '–' + money(v.total.yardHigh) : '—') + '</span></div>' +
+          '<div class="tally-spot">' + (v.total.spot ? money(v.total.spot) + ' at spot' : '') + '</div>' +
+        '</div>' +
+        pileHtml +
+        (costs > 0 ? '<div class="tally-costs">Less ' + money(costs) + ' of running around · ' +
+          '<b>' + money(Math.max(0, v.total.yardLow - costs)) + '–' +
+          money(Math.max(0, v.total.yardHigh - costs)) + ' actually yours</b></div>' : '') +
+        (v.total.anyEstimate ? '<p class="muted small">Some of those have no live feed, so they ' +
+          'use a rough standing figure — marked as an estimate rather than dressed up as a price.</p>' : '') +
+        '<div class="tally-actions">' +
+          '<button class="btn btn--primary" id="tallyAdd">＋ Weigh something in</button>' +
+          '<button class="btn btn--ghost btn--sm" id="tallyTrip">⛽ Log a run</button>' +
+          (v.lines.length ? '<button class="btn btn--ghost btn--sm" id="tallySell">Mark as sold</button>' : '') +
+        '</div>' +
+      '</div>' +
+
+      (life.loads ? '<h2 class="section-h">What you have actually made</h2>' +
+        '<div class="card">' +
+          '<div class="life-row"><span>' + life.loads + ' load' + (life.loads === 1 ? '' : 's') +
+            ' · ' + Math.round(life.kg) + ' kg</span></div>' +
+          '<div class="life-row"><span>Paid</span><b>' + money(life.paid) + '</b></div>' +
+          '<div class="life-row"><span>Fuel and running</span><b>−' + money(life.costs) + '</b></div>' +
+          '<div class="life-row is-total"><span>Actually made</span><b>' + money(life.profit) + '</b></div>' +
+          (life.ratio ? '<p class="muted small">Across every load you have been paid about ' +
+            Math.round(life.ratio * 100) + '% of spot. Watch that number: if one yard drags it ' +
+            'down, that is the yard, not the metal.</p>' : '') +
+        '</div>' : '') +
+
+      '<div class="card card--warn">' +
+        '<b>Why the two numbers</b>' +
+        '<p>Spot is the world price — the ceiling. A yard buys under it because they sort it, ' +
+        'cart it and on-sell it, and because they can. Knowing both means you can tell a fair ' +
+        'offer from a rubbish one instead of guessing.</p>' +
+      '</div>';
+  }
+
+  function wireTally() {
+    var addBtn = $('#tallyAdd');
+    if (addBtn) addBtn.addEventListener('click', function () {
+      openSheet('Weigh something in',
+        '<label class="field"><span>What is it</span><select class="input" id="tlMetal">' +
+          TL.metals().map(function (m) {
+            return '<option value="' + m.id + '">' + m.icon + ' ' + esc(m.label) + '</option>';
+          }).join('') +
+        '</select></label>' +
+        '<label class="field"><span>Kilos on the scales</span>' +
+          '<input class="input" id="tlKg" type="number" inputmode="decimal" step="0.1" min="0" ' +
+          'placeholder="0.0"></label>' +
+        '<label class="field"><span>Note (optional)</span>' +
+          '<input class="input" id="tlNote" type="text" placeholder="Off the Smiths job"></label>' +
+        '<div id="tlGrades" class="muted small"></div>' +
+        '<button class="btn btn--primary" id="tlSave">Add to the pile</button>');
+
+      function grades() {
+        var m = TL.metals().filter(function (x) { return x.id === $('#tlMetal').value; })[0];
+        $('#tlGrades').textContent = m ? m.grades : '';
+      }
+      $('#tlMetal').addEventListener('change', grades);
+      grades();
+
+      $('#tlSave').addEventListener('click', function () {
+        var kg = parseFloat($('#tlKg').value);
+        if (!(kg > 0)) { toast('How many kilos?', 'warn'); return; }
+        TL.add($('#tlMetal').value, kg, $('#tlNote').value);
+        J.sound('xp'); J.haptic('tap');
+        closeSheet();
+        renderKit('tally');
+      });
+    });
+
+    var tripBtn = $('#tallyTrip');
+    if (tripBtn) tripBtn.addEventListener('click', function () {
+      openSheet('Log a run',
+        '<p class="muted small">A drive out to pick something up is a cost against the load, ' +
+        'whether it feels like one or not. Log it and the ledger shows what you actually made.</p>' +
+        '<label class="field"><span>Kilometres</span>' +
+          '<input class="input" id="tlKm" type="number" inputmode="decimal" step="1" min="0" ' +
+          'placeholder="0"></label>' +
+        '<label class="field"><span>Litres of fuel (optional)</span>' +
+          '<input class="input" id="tlLitres" type="number" inputmode="decimal" step="0.1" min="0"></label>' +
+        '<label class="field"><span>Price per litre (optional)</span>' +
+          '<input class="input" id="tlFuel" type="number" inputmode="decimal" step="0.01" min="0" ' +
+          'placeholder="1.85"></label>' +
+        '<p class="muted small">Leave the fuel blank and it estimates at about 22 cents a ' +
+        'kilometre for a ute, which covers fuel and a bit of the wear.</p>' +
+        '<button class="btn btn--primary" id="tlTripSave">Add the run</button>');
+
+      $('#tlTripSave').addEventListener('click', function () {
+        var km = parseFloat($('#tlKm').value);
+        if (!(km > 0)) { toast('How far did you go?', 'warn'); return; }
+        TL.addTrip(km, $('#tlLitres').value, $('#tlFuel').value);
+        J.sound('tap');
+        closeSheet();
+        renderKit('tally');
+      });
+    });
+
+    var sellBtn = $('#tallySell');
+    if (sellBtn) sellBtn.addEventListener('click', function () {
+      var v = TL.valuePile();
+      openSheet('Mark it sold',
+        '<p class="muted small">What did they actually hand you? Recording it against what it ' +
+        'was worth is how you find out which yards are straight with you.</p>' +
+        (v.total.spot ? '<p>Expected: <b>' + money(v.total.yardLow) + '–' +
+          money(v.total.yardHigh) + '</b></p>' : '') +
+        '<label class="field"><span>Paid</span>' +
+          '<input class="input" id="tlPaid" type="number" inputmode="decimal" step="0.01" min="0" ' +
+          'placeholder="0.00"></label>' +
+        '<label class="field"><span>Which yard (optional)</span>' +
+          '<input class="input" id="tlWhere" type="text"></label>' +
+        '<button class="btn btn--primary" id="tlSold">Bank it</button>');
+
+      $('#tlSold').addEventListener('click', function () {
+        var paid = parseFloat($('#tlPaid').value);
+        if (!(paid >= 0)) { toast('What did they pay?', 'warn'); return; }
+        var load = TL.sell(paid, $('#tlWhere').value);
+        closeSheet();
+        renderKit('tally');
+        if (load && load.spot) {
+          var pct = Math.round((load.paid / load.spot) * 100);
+          J.sound('complete'); J.burst(window.innerWidth / 2, 240, 30, 1.1);
+          toast('Banked. That is ' + pct + '% of spot.', 'xp');
+        }
+      });
     });
   }
 
@@ -1743,6 +2175,214 @@
     });
   }
 
+  /* A note from Mick, full screen, until she closes it. It is deliberately not
+     a sheet, not spoken by the narrator, and not recorded in progress — it
+     leaves no trace once closed. */
+  function openHiddenNote() {
+    if ($('.note')) return;
+    var n = PERSONAL.note();
+    var el = document.createElement('div');
+    el.className = 'note';
+    el.innerHTML =
+      '<div class="note-inner">' +
+        n.lines.map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') +
+        '<div class="note-sign">' + esc(n.signoff) + '</div>' +
+        '<button class="btn btn--ghost btn--sm note-x">Close</button>' +
+      '</div>';
+    document.body.appendChild(el);
+    requestAnimationFrame(function () { el.classList.add('is-in'); });
+    J.haptic('badge');
+    J.burst(window.innerWidth / 2, window.innerHeight / 2, 26, 1);
+
+    function close() {
+      el.classList.remove('is-in');
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 260);
+    }
+    el.querySelector('.note-x').addEventListener('click', close);
+    el.addEventListener('click', function (e) { if (e.target === el) close(); });
+  }
+
+  /* =========================== the collection ===========================
+   * A collection layer, not a game engine — it reuses the celebration that
+   * already exists rather than building a match-3 loop, and says so plainly
+   * on the page so nobody is expecting Candy Crush.
+   * ===================================================================== */
+
+  function renderDolls() {
+    renderTabs('');
+    var p = DL.progress();
+    var next = DL.nextUp();
+
+    view.innerHTML =
+      '<a class="back" href="#/home">‹ Back</a>' +
+      '<h1 class="page-h">🪆 The collection</h1>' +
+      '<p class="page-sub">' + p.have + ' of ' + p.total + '. They nest biggest to smallest, ' +
+      'so the set fills inward — and the little one is the hard one.</p>' +
+
+      '<div class="dolls">' +
+        DL.dolls.map(function (d) {
+          var have = DL.has(d.id);
+          return '<button class="doll-cell' + (have ? '' : ' is-locked') + '" data-doll="' + d.id + '">' +
+            DL.svg(d, { width: 84, locked: !have }) +
+            '<span class="doll-name">' + (have ? esc(d.name) : '???') + '</span>' +
+          '</button>';
+        }).join('') +
+      '</div>' +
+
+      (next ? '<div class="card"><h3>Next one</h3>' +
+        '<p>' + esc(next.hint) + '.</p></div>'
+            : '<div class="card"><h3>That is the lot</h3>' +
+              '<p>Every doll in the set. There is nothing else hiding.</p></div>') +
+
+      '<div class="card card--warn">' +
+        '<b>What this is</b>' +
+        '<p>A set to collect, not a game to play — they unlock as you get through the course ' +
+        'and turn up at the bench. If you were expecting something to tap at, that is not what ' +
+        'this is, and saying so beats letting you find out.</p>' +
+      '</div>';
+
+    $('.dolls').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-doll]');
+      if (!btn) return;
+      var d = DL.byId(btn.getAttribute('data-doll'));
+      if (!d) return;
+      var have = DL.has(d.id);
+      tap();
+      openSheet(have ? d.name : 'Not yet',
+        '<div class="doll-big">' + DL.svg(d, { width: 150, locked: !have, suffix: 'big' }) + '</div>' +
+        (have
+          ? '<p>Number ' + d.size + ' of ' + DL.dolls.length + ' in the set.</p>' +
+            '<p class="muted">Earned for: ' + esc(d.hint.toLowerCase()) + '.</p>'
+          : '<p>Still hidden. You get this one for: <b>' + esc(d.hint.toLowerCase()) + '</b>.</p>'));
+    });
+  }
+
+  /* ====================== where this comes from =========================
+   * The answer to "how do I know any of this is right" is not an argument.
+   * It is a list of links she can tap and check herself.
+   * ===================================================================== */
+
+  function renderSources() {
+    renderTabs('');
+    var S = window.WA_SOURCES;
+
+    view.innerHTML =
+      '<a class="back" href="#/home">‹ Back</a>' +
+      '<h1 class="page-h">Where this comes from</h1>' +
+      '<p class="page-sub">Every claim in here is built on something published. These are the ' +
+      'actual sources — tap any of them and check it yourself.</p>' +
+
+      S.kinds().map(function (k) {
+        var list = S.sources.filter(function (s) { return s.kind === k.id; });
+        if (!list.length) return '';
+        return '<h2 class="section-h">' + k.icon + ' ' + k.label + '</h2>' +
+          list.map(function (s) {
+            return '<a class="src" href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' +
+              '<div class="src-title">' + esc(s.title) + '</div>' +
+              '<div class="src-what">' + esc(s.what) + '</div>' +
+              '<div class="src-foot"><span class="src-where">' + esc(s.where) + '</span>' +
+                '<span class="src-go">Open ↗</span></div>' +
+            '</a>';
+          }).join('');
+      }).join('') +
+
+      '<h2 class="section-h">⚖️ Where this app is estimating</h2>' +
+      '<p class="page-sub small">Not everything here has a standard behind it. These are ' +
+      'experience and arithmetic, and saying so is what keeps the rest of the page worth ' +
+      'anything.</p>' +
+      S.estimates.map(function (e) {
+        return '<div class="card"><h3>' + esc(e.what) + '</h3><p>' + esc(e.why) + '</p></div>';
+      }).join('') +
+
+      '<h2 class="section-h">📄 What this is</h2>' +
+      '<div class="card">' +
+        S.statement.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('') +
+        '<a class="btn btn--primary" href="#/ticket">The path to an actual ticket →</a>' +
+      '</div>';
+  }
+
+  /* ======================= the path to a ticket ==========================
+   * She will not get certified by an app, and the app says so. But
+   * recognition of prior learning is real, and the evidence for it is
+   * exactly what she has been quietly collecting all along.
+   * ===================================================================== */
+
+  function renderTicketPath() {
+    renderTabs('');
+    var log = P.state.log || [];
+    var withPhotos = log.filter(function (e) { return !!e.photo; });
+    var drills = P.drillCount();
+    var mods = C.modules.filter(function (m) { return m.tier !== 'advanced'; });
+    var doneMods = mods.filter(function (m) { return P.moduleComplete(m.id); });
+
+    view.innerHTML =
+      '<a class="back" href="#/home">‹ Back</a>' +
+      '<h1 class="page-h">🎓 Getting the actual ticket</h1>' +
+      '<p class="page-sub">This app does not certify you and never will. But it is not a ' +
+      'dead end either — here is the honest route from here to paper.</p>' +
+
+      '<div class="card">' +
+        '<h3>What recognition of prior learning is</h3>' +
+        '<p>RPL means a registered training organisation assesses skills you already have ' +
+        'instead of making you sit through teaching you do not need. It is a normal, funded ' +
+        'part of the system, not a loophole. You turn up, you show what you can do and what ' +
+        'you know, and they credit the units you can already evidence.</p>' +
+        '<p>It matters here because the gap between "knows the theory cold and has done the ' +
+        'drills" and "holds a certificate" is much smaller than the gap between knowing ' +
+        'nothing and holding one.</p>' +
+      '</div>' +
+
+      '<h2 class="section-h">What you have got so far</h2>' +
+      '<div class="card card--portfolio">' +
+        '<div class="port-row"><span>Units finished</span><b>' + doneMods.length + ' of ' + mods.length + '</b></div>' +
+        '<div class="port-row"><span>Bench drills done</span><b>' + drills + '</b></div>' +
+        '<div class="port-row"><span>Weld log entries</span><b>' + log.length + '</b></div>' +
+        '<div class="port-row"><span>With dated photos</span><b>' + withPhotos.length + '</b></div>' +
+        '<div class="port-row"><span>Badges earned</span><b>' + P.state.badges.length + '</b></div>' +
+        (log.length
+          ? '<a class="btn btn--ghost btn--sm" href="#/kit/log">Open the log</a>'
+          : '<p class="muted small">The weld log is the bit that counts most and it is empty. ' +
+            'Photograph what you weld, dated, from now on — that is the evidence.</p>') +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>What an assessor actually wants to see</h3>' +
+        '<p>Not a certificate from an app. Evidence that you can do the work:</p>' +
+        '<ul>' +
+          '<li><b>Dated photographs of your own welds</b>, ideally showing progression over ' +
+          'months rather than one good day. This is what the weld log is for.</li>' +
+          '<li><b>Cut-and-etched coupons and bend tests</b> — a weld cut through, polished and ' +
+          'etched shows penetration and fusion in a way a photo of the surface cannot.</li>' +
+          '<li><b>A record of what you have practised</b>, which is what the drill log is.</li>' +
+          '<li><b>Any workplace or supervisor statements</b> you can get, if you have welded ' +
+          'for anyone.</li>' +
+          '<li><b>Knowledge</b>, which they will test by asking. That is the part this app is ' +
+          'genuinely good at.</li>' +
+        '</ul>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>The realistic shape of it</h3>' +
+        '<p>Keep learning in the ute and at the bench. Do the drills, photograph them, and ' +
+        'keep the coupons. When the log has months in it, ring a few RTOs and ask what they ' +
+        'would credit through RPL and what gap training they would want.</p>' +
+        '<p>Most likely it is a small number of gap units and a coded test on a real coupon — ' +
+        'months rather than years, and you walk in already knowing the job instead of learning ' +
+        'it in front of an assessor.</p>' +
+        '<p class="muted small">No promises on time or cost: both depend entirely on the RTO ' +
+        'and your state, and anyone who quotes you a number without seeing your evidence is ' +
+        'guessing.</p>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>Where to look</h3>' +
+        '<p>The national register lists every RTO and exactly what each qualification requires.</p>' +
+        '<a class="btn btn--primary" href="https://training.gov.au/Training/Details/MEM31420" ' +
+          'target="_blank" rel="noopener noreferrer">MEM31420 Certificate III ↗</a>' +
+        '<a class="btn btn--ghost btn--sm" href="#/sources">All the sources →</a>' +
+      '</div>';
+  }
+
   /* ============================ settings ================================ */
 
   function renderSettings() {
@@ -1800,6 +2440,49 @@
         '<button class="btn btn--ghost btn--sm" id="voiceTest">Hear it</button>' +
       '</div>' : '') +
 
+      '<div class="card">' +
+        '<h3>🔄 Sync across devices <span class="pill pill--dim">optional</span></h3>' +
+        '<p class="muted small">Off by default — everything already lives on this phone and stays ' +
+        'there. If you run the little server that ships with this app (<code>node server</code>, ' +
+        'see the README), pick any word as a code and the same code on a second device pulls your ' +
+        'progress across. That is the entire account system — no email, no password. Anyone who ' +
+        'knows your code could read it too, so pick something nobody would guess, the same as you ' +
+        'would a house key hidden under a pot.</p>' +
+        '<label class="field"><span>Server address</span>' +
+          '<input class="input" id="syncUrl" type="url" value="' + esc(SY.config().url || '') + '" ' +
+          'placeholder="http://192.168.1.20:8787"></label>' +
+        '<label class="field"><span>Your code</span>' +
+          '<input class="input" id="syncCode" type="text" value="' + esc(SY.config().code || '') + '" ' +
+          'placeholder="a word only you would pick" autocomplete="off"></label>' +
+        '<label class="switch"><input type="checkbox" id="syncAuto"' +
+          (SY.config().auto ? ' checked' : '') + '>' +
+          '<span class="switch-track"><i></i></span><span>Keep it synced automatically</span></label>' +
+        '<div class="tally-actions">' +
+          '<button class="btn btn--primary btn--sm" id="syncPush">Push this device’s progress</button>' +
+          '<button class="btn btn--ghost btn--sm" id="syncPull">Pull from that code instead</button>' +
+        '</div>' +
+        '<p class="muted small" id="syncStatus"></p>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>💬 Let Old Mate talk properly (optional)</h3>' +
+        '<p class="muted small">He already answers from what is in this app, with no signal and ' +
+        'without inventing anything — that is the default and it needs nothing set up. Adding a key ' +
+        'lets him put the same answers in his own words. He is still only allowed to use what is in ' +
+        'here, and if there is no signal he falls straight back to the offline answer.</p>' +
+        '<label class="field"><span>Service</span><select class="input" id="chatProvider">' +
+          [['off', 'Off — offline answers only'],
+           ['anthropic', 'Claude (Anthropic)'],
+           ['custom', 'Your own endpoint']].map(function (o) {
+            return '<option value="' + o[0] + '"' +
+              (WA_ASK.config().provider === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+          }).join('') +
+        '</select></label>' +
+        '<div id="chatFields"></div>' +
+        (SY.config().url ? '<button class="btn btn--ghost btn--sm" id="chatUseSync">' +
+          'Use my sync server instead of a key</button>' : '') +
+      '</div>' +
+
       (installPrompt ? '<div class="card card--install">' +
         '<h3>📲 Install on this device</h3>' +
         '<p class="muted">Adds it to your home screen and lets it run full screen, offline, like any other app.</p>' +
@@ -1855,6 +2538,101 @@
       P.setSetting('profile', null);
       go('#/home');
       render();
+    });
+
+    /* The chat key fields: nothing shown at all while it is off, so there is
+       no half-finished AI panel sitting there looking broken. */
+    function paintChat() {
+      var c = WA_ASK.config();
+      var host = $('#chatFields');
+      if (!host) return;
+      if (!c.provider || c.provider === 'off') { host.innerHTML = ''; return; }
+      host.innerHTML =
+        (c.provider === 'custom'
+          ? '<label class="field"><span>Endpoint URL</span>' +
+            '<input class="input" id="chatUrl" type="url" value="' + esc(c.url || '') + '" ' +
+            'placeholder="https://…"></label>'
+          : '') +
+        '<label class="field"><span>Key</span>' +
+          '<input class="input" id="chatKey" type="password" value="' + esc(c.key || '') + '" ' +
+          'placeholder="Paste it here" autocomplete="off"></label>' +
+        '<label class="field"><span>Model (optional)</span>' +
+          '<input class="input" id="chatModel" type="text" value="' + esc(c.model || '') + '" ' +
+          'placeholder="Leave blank for the default"></label>' +
+        '<p class="muted small">The key is stored on this phone only, and is sent to that service ' +
+        'and nowhere else.</p>';
+
+      ['chatUrl', 'chatKey', 'chatModel'].forEach(function (id) {
+        var el = $('#' + id);
+        if (!el) return;
+        el.addEventListener('change', function () {
+          var cfg = WA_ASK.config();
+          cfg[id.replace('chat', '').toLowerCase()] = el.value.trim();
+          WA_ASK.save(cfg);
+        });
+      });
+    }
+
+    $('#chatProvider').addEventListener('change', function (e) {
+      var cfg = WA_ASK.config();
+      cfg.provider = e.target.value;
+      WA_ASK.save(cfg);
+      paintChat();
+    });
+    paintChat();
+
+    var useSyncBtn = $('#chatUseSync');
+    if (useSyncBtn) useSyncBtn.addEventListener('click', function () {
+      var cfg = WA_ASK.config();
+      cfg.provider = 'custom';
+      cfg.url = SY.config().url.replace(/\/+$/, '') + '/api/ask';
+      WA_ASK.save(cfg);
+      $('#chatProvider').value = 'custom';
+      paintChat();
+      toast('Pointed at your sync server. It needs ANTHROPIC_API_KEY set there.', 'xp');
+    });
+
+    /* ---- sync ---- */
+
+    ['syncUrl', 'syncCode'].forEach(function (id) {
+      var el = $('#' + id);
+      el.addEventListener('change', function () {
+        var cfg = SY.config();
+        cfg[id === 'syncUrl' ? 'url' : 'code'] = el.value.trim();
+        SY.save(cfg);
+      });
+    });
+    $('#syncAuto').addEventListener('change', function (e) {
+      var cfg = SY.config();
+      cfg.auto = e.target.checked;
+      SY.save(cfg);
+    });
+
+    function syncStatus(msg) { var el = $('#syncStatus'); if (el) el.textContent = msg; }
+
+    $('#syncPush').addEventListener('click', function () {
+      if (!SY.isConfigured()) { toast('Fill in the server address and a code first.', 'warn'); return; }
+      syncStatus('Pushing…');
+      SY.push().then(function (r) {
+        syncStatus(r.ok
+          ? (r.reason === 'unchanged' ? 'Already up to date.' : 'Pushed just now.')
+          : 'Could not push: ' + r.reason);
+        if (r.ok) { J.sound('xp'); J.haptic('tap'); }
+      });
+    });
+
+    $('#syncPull').addEventListener('click', function () {
+      if (!SY.isConfigured()) { toast('Fill in the server address and a code first.', 'warn'); return; }
+      if (!confirm('This replaces everything on THIS device with whatever is saved under that code. Sure?')) return;
+      syncStatus('Pulling…');
+      SY.pullAndApply().then(function (r) {
+        if (r.ok) {
+          syncStatus('Pulled. Reloading…');
+          setTimeout(function () { location.reload(); }, 500);
+        } else {
+          syncStatus('Could not pull: ' + r.reason);
+        }
+      });
     });
 
     var personaRow = $('#personaRow');
@@ -1971,6 +2749,9 @@
       case 'kit':      renderKit(parts[1]); break;
       case 'settings': renderSettings(); break;
       case 'drive':    renderDrive(parts[1]); break;
+      case 'sources':  renderSources(); break;
+      case 'ticket':   renderTicketPath(); break;
+      case 'dolls':    renderDolls(); break;
       default:         renderHome();
     }
   }

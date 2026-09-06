@@ -190,6 +190,19 @@ window.WA_MARKET = (function () {
     });
   }
 
+  /* The raw number behind a row, in AUD per kilo, for anything that needs to
+     do arithmetic rather than print it (the tally values a pile with this).
+     Null when there is no price or no exchange rate yet — the caller decides
+     what to say about that rather than being handed a made-up figure. */
+  function perKg(id) {
+    var item = ITEMS.filter(function (i) { return i.id === id; })[0];
+    var p = item && state.prices[item.id];
+    if (!item || !p || item.unit === 'coin') return null;
+    var perUnitAud = aud(p.usd);
+    if (perUnitAud == null) return null;
+    return item.unit === 'lb' ? perUnitAud / LB_KG : (perUnitAud / TROY_OZ_G) * 1000;
+  }
+
   function fetchedAgo() {
     if (!state.fetchedAt) return null;
     var mins = Math.round((Date.now() - state.fetchedAt) / 60000);
@@ -205,6 +218,7 @@ window.WA_MARKET = (function () {
     load: loadCache,
     refresh: refresh,
     rows: rows,
+    perKg: perKg,
     fetchedAgo: fetchedAgo,
     isFresh: isFresh,
     get state() { return state; },

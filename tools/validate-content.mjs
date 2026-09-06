@@ -11,7 +11,9 @@ const root = join(here, '..');
 
 const sandbox = { window: {} };
 for (const file of ['js/content.js', 'js/reference.js', 'js/diagrams.js',
-                    'js/practice.js', 'js/content-mastery.js', 'js/script.js']) {
+                    'js/practice.js', 'js/content-mastery.js', 'js/content-salvage.js', 'js/script.js',
+                    'js/sources.js', 'js/dolls.js',
+                    'js/teardown.js']) {
   const src = readFileSync(join(root, file), 'utf8');
   new Function('window', src)(sandbox.window);
 }
@@ -22,6 +24,9 @@ const PR = sandbox.window.WA_PRACTICE;
 const DG = sandbox.window.WA_DIAGRAMS;
 const DMAP = sandbox.window.WA_DIAGRAM_MAP;
 const SC = sandbox.window.WA_SCRIPT;
+const TD = sandbox.window.WA_TEARDOWN;
+const SRC = sandbox.window.WA_SOURCES;
+const DL = sandbox.window.WA_DOLLS;
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -196,6 +201,87 @@ for (const id of DG?.ids ?? []) {
   if (!SC.diagramLine(id)) fail(`Diagram "${id}" has no spoken description in js/script.js`);
 }
 
+/* ---- teardown: every entry has to commit to an answer ---- */
+
+const seenTd = new Set();
+for (const it of TD?.items ?? []) {
+  if (seenTd.has(it.id)) fail(`Teardown entry "${it.id}" is duplicated`);
+  seenTd.add(it.id);
+  if (!it.name || !it.icon) fail(`Teardown entry "${it.id}" is missing a name or icon`);
+  if (!['strip', 'whole', 'leave'].includes(it.verdict)) {
+    fail(`Teardown entry "${it.id}" has no clear verdict (got "${it.verdict}")`);
+  }
+  if (!it.verdictWhy) fail(`Teardown entry "${it.id}" gives a verdict without saying why`);
+  // She learns with her hands, so the memory hook is not optional.
+  if (!it.hook) fail(`Teardown entry "${it.id}" has no word-association hook`);
+  if (!it.metals) fail(`Teardown entry "${it.id}" does not say what is in it`);
+  if (!it.notes?.length) fail(`Teardown entry "${it.id}" has no notes`);
+  if (!(it.time > 0)) fail(`Teardown entry "${it.id}" has no time estimate`);
+}
+
+/* ---- sources: the page whose whole job is "check me" ----
+   A dead or vague link here is worse than no page at all, so the shape of
+   every entry is enforced. Whether the URLs still resolve is checked
+   separately by tools/check-links.mjs, which needs the network. */
+
+const seenSrc = new Set();
+for (const s of SRC?.sources ?? []) {
+  if (seenSrc.has(s.id)) fail(`Source "${s.id}" is duplicated`);
+  seenSrc.add(s.id);
+  if (!s.title || !s.what || !s.where) fail(`Source "${s.id}" is missing a field`);
+  if (!/^https:\/\//.test(s.url || '')) fail(`Source "${s.id}" has no https URL`);
+  // No placeholder or search-page links pretending to be citations.
+  if (/example\.com|TODO|\?q=|\/search/i.test(s.url)) fail(`Source "${s.id}" links to a placeholder or a search page`);
+  // A source attached to nothing never shows up on the unit it backs, and a
+  // typo'd module id fails silently — so both are caught here.
+  if (!s.units?.length) fail(`Source "${s.id}" is not attached to any unit`);
+  for (const u of s.units ?? []) {
+    if (!C.modules.some((m) => m.id === u)) fail(`Source "${s.id}" cites unknown unit "${u}"`);
+  }
+}
+// The units making the strongest claims must be able to show their working.
+for (const id of ['safety', 'ticket']) {
+  if (!SRC.byUnit(id).length) fail(`Unit "${id}" has no sources attached to it`);
+}
+if ((SRC?.sources ?? []).length < 8) fail('The sources page is too thin to be worth anything');
+if (!(SRC?.estimates ?? []).length) fail('Nothing is declared as an estimate — that cannot be right');
+if (!(SRC?.statement ?? []).some((p) => /written by an AI/i.test(p))) {
+  fail('The sources page does not state plainly that an AI wrote this');
+}
+// Every kind listed must actually have entries, or the page renders a heading
+// over nothing.
+for (const k of SRC?.kinds() ?? []) {
+  if (!SRC.sources.some((s) => s.kind === k.id)) fail(`Source kind "${k.id}" has no entries`);
+}
+
+/* ---- the collection: every doll must be reachable ---- */
+
+const sizes = new Set();
+for (const d of DL?.dolls ?? []) {
+  if (sizes.has(d.size)) fail(`Two dolls share size ${d.size}`);
+  sizes.add(d.size);
+  if (!d.name || !d.hint) fail(`Doll "${d.id}" is missing a name or a hint`);
+  for (const c of ['body', 'shawl', 'face', 'flower']) {
+    if (!/^#[0-9a-f]{6}$/i.test(d[c] || '')) fail(`Doll "${d.id}" has no ${c} colour`);
+  }
+  // An unlock condition nothing can satisfy means a doll nobody ever gets.
+  const [kind, arg] = d.how.split(':');
+  if (kind === 'module') {
+    if (!C.modules.some((m) => m.id === arg)) fail(`Doll "${d.id}" unlocks on unknown unit "${arg}"`);
+  } else if (['streak', 'drills', 'badges'].includes(kind)) {
+    if (!(Number(arg) > 0)) fail(`Doll "${d.id}" has a nonsense threshold "${arg}"`);
+    if (kind === 'badges' && Number(arg) > R.badges.length) {
+      fail(`Doll "${d.id}" needs ${arg} badges but only ${R.badges.length} exist`);
+    }
+  } else {
+    fail(`Doll "${d.id}" has an unknown unlock kind "${kind}"`);
+  }
+}
+if ((DL?.dolls ?? []).length < 6) fail('Too few dolls for a set worth collecting');
+// Spread across different kinds of play, so no single habit completes the set.
+const kinds = new Set((DL?.dolls ?? []).map((d) => d.how.split(':')[0]));
+if (kinds.size < 3) fail('Every doll unlocks the same way — the set is not worth collecting');
+
 /* ---- offline: every script the page loads must be cached ----
    Forgetting one here does not break anything until she is somewhere with no
    signal, which is exactly where this app is meant to work. */
@@ -225,4 +311,7 @@ if (errors.length) {
 console.log('✓ Content valid');
 console.log(`  ${C.modules.length} modules · ${lessonCount} lessons · ${quizCount} quiz questions`);
 console.log(`  ${Object.keys(PR).length} bench drills · ${Object.values(PR).reduce((n, e) => n + e.recall.length, 0)} recall cards · ${DG.ids.length} diagrams`);
+console.log(`  ${DL.dolls.length} dolls in the collection`);
+console.log(`  ${SRC.sources.length} linked sources · ${SRC.estimates.length} declared estimates`);
+console.log(`  ${TD.items.length} teardown entries · ${TD.items.filter((i) => i.danger).length} carry a safety warning`);
 console.log(`  ${R.clues.length} clues · ${R.defects.length} defects · ${R.badges.length} badges · ${R.cheatsheets.length} cheat sheets`);
