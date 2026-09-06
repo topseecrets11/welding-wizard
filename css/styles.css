@@ -621,6 +621,18 @@ td:first-child { font-weight: 750; }
 .switch input:checked + .switch-track { background: rgba(var(--accent-glow),.3); border-color: var(--accent); }
 .switch input:checked + .switch-track i { left: 25px; background: var(--accent); }
 .card--install { border-color: rgba(var(--accent-glow),.4); }
+
+/* The very first thing she can tap, before the pitch even — one press and
+   the browser disappears for good. Text-only on iOS, since there is no
+   button to give it. */
+.install-banner {
+  text-align: left; margin: 0 0 22px; padding: 16px;
+  border: 1.5px solid rgba(var(--accent-glow),.4); border-radius: 14px;
+  background: linear-gradient(165deg, rgba(var(--accent-glow),.12), var(--card));
+}
+.install-banner p { margin: 10px 0 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
+.install-banner p:first-child { margin-top: 0; }
+.install-banner b { color: var(--text); }
 code { background: var(--card-2); padding: 2px 6px; border-radius: 5px; font-size: 12.5px; }
 
 /* ------------------------------------------------------------------ buttons */

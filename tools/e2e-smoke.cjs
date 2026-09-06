@@ -45,6 +45,29 @@ function check(name, cond, extra) {
   /* ---------- onboarding: name, then the eight profile questions ---------- */
   await page.waitForSelector('#wstart');
   await shot(page, '01-welcome.png');
+
+  // The install nudge lives on the very first screen, not buried in a menu —
+  // that is the entire point of it. It starts hidden (the real browser event
+  // has not fired yet in this sandbox) and a fired event must reveal it live,
+  // in place, without her needing to navigate anywhere.
+  check('the install nudge is on the very first screen, hidden until offered',
+    await page.evaluate(() => {
+      const b = document.getElementById('wInstallBanner');
+      return !!b && b.hidden === true;
+    }));
+  await page.evaluate(() => {
+    const ev = new Event('beforeinstallprompt', { cancelable: true });
+    ev.prompt = () => {};
+    ev.userChoice = Promise.resolve({ outcome: 'accepted' });
+    window.dispatchEvent(ev);
+  });
+  check('it appears the moment the browser says installing is allowed',
+    await page.evaluate(() => document.getElementById('wInstallBanner').hidden === false));
+  await page.click('#wInstallBtn');
+  await page.waitForTimeout(50);
+  check('tapping it fires the real install prompt and then gets out of the way',
+    await page.evaluate(() => document.getElementById('wInstallBanner').hidden === true));
+
   await page.fill('#wname', 'Tess');
   await page.click('#wstart');
 
@@ -986,6 +1009,35 @@ function check(name, cond, extra) {
       const r = await WA_MARKET.refresh({ force: true });
       return r && typeof r === 'object' && !WA_MARKET.state.loading;
     }));
+
+  /* ---------- install nudge: iOS gets words, an installed app gets nothing ---------- */
+  const iosCtx = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15'
+  });
+  const iosPage = await iosCtx.newPage();
+  await iosPage.goto(APP);
+  await iosPage.waitForSelector('#wstart');
+  check('iPhone gets plain Share-sheet words, since there is no install button to give it',
+    await iosPage.evaluate(() => {
+      const banner = document.querySelector('.install-banner');
+      return !!banner && /Add to Home Screen/i.test(banner.textContent) && !banner.querySelector('button');
+    }));
+  await iosCtx.close();
+
+  const installedCtx = await browser.newContext();
+  await installedCtx.addInitScript(() => {
+    const real = window.matchMedia ? window.matchMedia.bind(window) : null;
+    window.matchMedia = function (q) {
+      if (/display-mode:\s*standalone/.test(q)) return { matches: true, addListener() {}, removeListener() {} };
+      return real ? real(q) : { matches: false, addListener() {}, removeListener() {} };
+    };
+  });
+  const installedPage = await installedCtx.newPage();
+  await installedPage.goto(APP);
+  await installedPage.waitForSelector('#wstart');
+  check('already installed and running as the app itself — no nudge to add what she already has',
+    await installedPage.evaluate(() => !document.querySelector('.install-banner')));
+  await installedCtx.close();
 
   await browser.close();
 

@@ -66,6 +66,35 @@
 
   function tap() { J.sound('tap'); J.haptic('tap'); }
 
+  /* Already running as an installed app (Android's real check, iOS's own
+     flag) — if so, she is already where we want her and no banner is owed. */
+  function isStandalone() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+  }
+  function isIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent || '') && !window.MSStream;
+  }
+
+  /* One obvious button on the very first screen, not a menu item she would
+     have to go looking for. iOS gives no programmatic install hook at all,
+     so it gets plain words instead of a button; Android/Chrome/Brave gets
+     the real one-tap install, shown the moment the browser says it is
+     allowed (see the beforeinstallprompt listener in boot()) — hidden until
+     then rather than absent, so it can appear without a full re-render. */
+  function installBanner() {
+    if (isIOS()) {
+      return '<div class="install-banner">' +
+        '<p><b>📲 On iPhone:</b> tap <b>Share</b> below, then <b>Add to Home Screen</b> — ' +
+        'then always open it from there. No browser bar, full screen, just the app.</p>' +
+      '</div>';
+    }
+    return '<div class="install-banner"' + (installPrompt ? '' : ' hidden') + ' id="wInstallBanner">' +
+      '<button class="btn btn--primary btn--big" id="wInstallBtn">📲 Put this on the home screen</button>' +
+      '<p class="welcome-fine">One tap now, and it opens full screen from here on — no browser, no address bar, just the app.</p>' +
+    '</div>';
+  }
+
   /* ========================= tiles and sheets ===========================
    * Long pages lose her. Everything that used to be a wall of stacked cards
    * is now a grid of tiles, and the detail lives in a sheet that slides up
@@ -378,6 +407,7 @@
     var retake = !!P.state.name;
     var step = retake ? 1 : 0;          // 0 = the pitch, 1..8 = the questions
     var pending = P.state.name || '';
+    var showInstall = !isStandalone() && !retake;   // only the first time, never once it's an app
 
     function paintIntro() {
       view.innerHTML =
@@ -385,6 +415,7 @@
           '<div class="welcome-arc">⚡</div>' +
           '<h1>Weld Academy</h1>' +
           '<p class="welcome-sub">Stick, MIG and TIG — taught properly, drilled at the bench, and a shed companion for when it goes wrong.</p>' +
+          (showInstall ? installBanner() : '') +
           '<div class="welcome-points">' +
             '<div><span>📚</span><b>Nine modules, 39 lessons.</b> The same knowledge a trade course teaches. Metric, Australian standards.</div>' +
             '<div><span>🔧</span><b>Bench drills.</b> Every lesson has a job to go and do, with pass marks you can judge yourself against.</div>' +
@@ -408,6 +439,20 @@
       $('#wstart').addEventListener('click', next);
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') next(); });
       input.focus();
+
+      var wInstallBtn = $('#wInstallBtn');
+      if (wInstallBtn) {
+        wInstallBtn.addEventListener('click', function () {
+          if (!installPrompt) return;
+          var p = installPrompt;
+          installPrompt = null;
+          p.prompt();
+          p.userChoice.then(function () {
+            var banner = $('#wInstallBanner');
+            if (banner) banner.hidden = true;
+          });
+        });
+      }
     }
 
     function paintQuestion() {
@@ -2784,6 +2829,11 @@
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();
       installPrompt = e;
+      // The event usually arrives a beat after first paint, not before it —
+      // reveal the banner in place rather than wait for her to navigate
+      // back to a screen that would render it fresh.
+      var banner = document.getElementById('wInstallBanner');
+      if (banner) banner.hidden = false;
     });
 
     if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
