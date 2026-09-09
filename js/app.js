@@ -565,9 +565,12 @@
     ].sort(function (a, b) { return (b.k === lead) - (a.k === lead); })
      .map(function (c) { return c.html; }).join('');
 
+    var showUnicornPeek = P.moduleComplete('safety') && !PERSONAL.hasFoundUnicorn();
+
     view.innerHTML =
       '<div class="hero">' +
         '<div class="hero-bg"></div>' +
+        (showUnicornPeek ? PERSONAL.unicornPeekHtml(30) : '') +
         '<div class="hero-row">' +
           '<div class="hero-ring">' + ring(overall, 'var(--accent)', 76, 6) +
             '<span class="hero-pct">' + overall + '<i>%</i></span></div>' +
@@ -610,6 +613,26 @@
     /* Nothing on screen points at this. Press and hold her name, three times.
        Not spoken, not logged, not written down anywhere. */
     PERSONAL.attachHiddenNote($('#heroHi'), openHiddenNote);
+
+    /* The unicorn peek — sitting quietly in the hero's own background glow
+       since the last unit finished, until she actually taps it. This is the
+       moment of finding him: the real photo and his real words, for the
+       first time, not a guaranteed pop-up she could not have missed. */
+    var peek = $('#unicornPeek');
+    if (peek) {
+      peek.addEventListener('click', function () {
+        PERSONAL.markUnicornFound();
+        J.burstFrom(peek, 18, 1);
+        J.celebrate({
+          kind: 'complete',
+          character: 'unicorn',
+          art: PERSONAL.unicornSpeech(150),
+          kicker: 'First unit done',
+          title: PERSONAL.unicorn().line,
+          button: '🦄'
+        });
+      });
+    }
     paintTicker();
     afterPaint(function () { MK.refresh().then(paintTicker); });
   }
@@ -730,6 +753,49 @@
         '<i>' + (next ? esc(next.hint) + ' for the next one' : 'Complete set') + '</i>' +
       '</div>' +
     '</a>';
+  }
+
+  /* --------------------------------------------------------- doll peeks
+   * "More prominent... in various places... or just flashing on the screen."
+   * The Collection strip on Home is the tidy version; this is the wild one —
+   * a doll turning up in a corner of whatever page she is already on, gone
+   * again in a few seconds if she does not tap it. Cooldown and a coin-flip
+   * keep it from showing on every single navigation, which would just make
+   * it wallpaper rather than something worth noticing. */
+  var lastDollPeekAt = 0;
+  var DOLL_PEEK_SPOTS = ['tl', 'tr', 'bl', 'br'];
+
+  function maybeShowDollPeek() {
+    var route = (location.hash || '').replace(/^#\/?/, '');
+    var now = Date.now();
+    if (!DL.shouldPeek(route, now, lastDollPeekAt)) return;
+    lastDollPeekAt = now;
+
+    var doll = DL.nextUp();
+    if (!doll) return;
+    var spot = DOLL_PEEK_SPOTS[Math.floor(Math.random() * DOLL_PEEK_SPOTS.length)];
+
+    var el = document.createElement('button');
+    el.className = 'doll-peek doll-peek--' + spot;
+    el.setAttribute('aria-label', 'A doll, tucked away — tap to see the collection');
+    el.innerHTML = DL.peekHtml(doll);
+    document.body.appendChild(el);
+    requestAnimationFrame(function () { el.classList.add('is-in'); });
+
+    var gone = false;
+    function remove() {
+      if (gone) return;
+      gone = true;
+      el.classList.remove('is-in');
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 260);
+    }
+    el.addEventListener('click', function () {
+      J.burstFrom(el, 16, 1);
+      J.sound('tap');
+      remove();
+      setTimeout(function () { go('#/dolls'); }, 120);
+    });
+    setTimeout(remove, 7000);
   }
 
   /* The optional units, offered rather than pushed. Anything in here is real
@@ -1020,19 +1086,11 @@
     $('#doneBtn').addEventListener('click', function (e) {
       var res = P.completeLesson(m.id, l.id);
 
-      /* One wink, in one place: the tile that closes out her very first unit.
-         It goes ahead of the standard celebrations so it lands first. */
-      if (res.xp && PERSONAL.isUnicornLesson(m.id, l.id)) {
-        J.celebrate({
-          kind: 'complete',
-          character: 'unicorn',
-          art: PERSONAL.unicornSpeech(150),
-          kicker: 'First unit done',
-          title: PERSONAL.unicorn().line,
-          button: '🦄'
-        });
-      }
-
+      /* Finishing the first unit used to auto-fire the unicorn celebration
+         right here — which is not really "finding" anything, it is just a
+         guaranteed pop-up. It only unlocks the peek on the home screen now;
+         PERSONAL.isUnicornLesson stays as the unlock condition, checked from
+         renderHome() instead of celebrated from here. */
       announce(res, { from: e.currentTarget });
       var nextHref = isLast ? '#/quiz/' + m.id : '#/lesson/' + m.id + '/' + m.lessons[idx + 1].id;
       setTimeout(function () { go(nextHref); }, res.xp ? 420 : 0);
@@ -2892,6 +2950,7 @@
       if (N.supported()) N.stop();
       render();
       scrollTop();
+      maybeShowDollPeek();
     });
 
     window.addEventListener('beforeinstallprompt', function (e) {

@@ -808,6 +808,57 @@ function check(name, cond, extra) {
       !WA_PERSONAL.isUnicornLesson('safety', first) &&
       !WA_PERSONAL.isUnicornLesson('smaw', last);
   }));
+  /* ------------------------------------------------- doll peeks (dolls.js)
+   * The decision logic is a real exported function precisely so it can be
+   * proven here without fighting a live 45-second cooldown or real
+   * randomness — the coin flip is passed in rather than rolled. */
+  check('a doll peek can fire on an ordinary page, given a low enough roll', await page.evaluate(() =>
+    WA_DOLLS.shouldPeek('course', Date.now(), 0, 0.1) === true));
+  check('but never on the home route — the full collection strip already lives there', await page.evaluate(() =>
+    WA_DOLLS.shouldPeek('home', Date.now(), 0, 0.1) === false));
+  check('never within the cooldown of the last one', await page.evaluate(() => {
+    var now = Date.now();
+    return WA_DOLLS.shouldPeek('course', now, now - 1000, 0.1) === false &&
+           WA_DOLLS.shouldPeek('course', now, now - (WA_DOLLS.PEEK_COOLDOWN_MS + 500), 0.1) === true;
+  }));
+  check('and never once the whole set is already collected — nothing left to hunt for', await page.evaluate(() => {
+    var before = WA_PROGRESS.settings().dolls || [];
+    WA_PROGRESS.setSetting('dolls', WA_DOLLS.dolls.map(d => d.id));
+    var blocked = WA_DOLLS.shouldPeek('course', Date.now(), 0, 0.1) === false;
+    WA_PROGRESS.setSetting('dolls', before);
+    return blocked;
+  }));
+  check('a peek renders as the usual locked silhouette, not a free unlock', await page.evaluate(() =>
+    WA_DOLLS.peekHtml(WA_DOLLS.dolls[0], 34).includes('is-locked')));
+
+  /* ----------------------------------------------------- the unicorn peek
+   * Deterministic, unlike the doll peeks — it shows whenever the first unit
+   * is done and she has not found him yet, so it is provable end to end
+   * through the real page rather than just through the helper functions. */
+  await page.goto(APP + '#/home');
+  await page.waitForSelector('.hero');
+  check('the unicorn peek appears once the first unit is done and not yet found',
+    (await page.locator('#unicornPeek').count()) === 1);
+  await page.click('#unicornPeek', { force: true });   // it drifts continuously; that is the point, not a bug
+  await page.waitForSelector('.celebrate.is-in');
+  const foundArt = await page.evaluate(() => document.querySelector('.celebrate-art').innerHTML);
+  check('tapping it reveals his real photo and his real words, not a preview',
+    foundArt.includes('mick-unicorn.png') && foundArt.includes('speech-bubble') && /Nicole/.test(foundArt));
+  check('and finding him is now recorded', await page.evaluate(() => WA_PERSONAL.hasFoundUnicorn()));
+  await page.click('.celebrate-btn');
+  await page.waitForTimeout(320);
+  // Already on #/home — going there again is a no-op hash change and would
+  // never re-render, so leave and come back to force a fresh paint of it.
+  await page.goto(APP + '#/course');
+  await page.waitForSelector('.map, .modules, h1');
+  await page.goto(APP + '#/home');
+  await page.waitForSelector('.hero');
+  check('once found, the peek does not linger on the home screen asking to be found again',
+    (await page.locator('#unicornPeek').count()) === 0);
+  // Leave state as every test after this one expects it: not yet found. The
+  // badge-back tests below specifically prove the pre-discovery behaviour.
+  await page.evaluate(() => WA_PROGRESS.setSetting('foundUnicorn', false));
+
   // The one wink in the app was a bare 🦄, which made it look like every other
   // emoji in here rather than like something put there on purpose.
   // Mick's own character art, with the drawn one kept as the fallback so a
@@ -836,37 +887,61 @@ function check(name, cond, extra) {
       const html = WA_PERSONAL.mickCharacter(150);
       return /<img/.test(html) && html.includes('img/mick-hoodie.png') && /onerror=/.test(html);
     }));
-  // Every badge can be turned over to the unicorn saying he is proud — a
-  // separate pool from his one personal message to her, since this one fires
-  // on every single badge and has to hold up to being seen a lot.
-  check('a badge has a flippable back with the unicorn praising her, distinct from his one personal message',
-    await page.evaluate(() => {
-      const back = WA_PERSONAL.badgeBack(120);
-      const seen = new Set();
-      for (let i = 0; i < 30; i++) seen.add(WA_PERSONAL.unicornPraise());
-      return back.includes('speech-bubble') && back.includes('img/mick-unicorn.png') &&
-             seen.size >= 3 && ![...seen].some(s => /Nicole/.test(s));
-    }));
+  // Every badge can be turned over — but the unicorn only takes the back
+  // once she has actually found him. Before that it is Mick's own cartoon
+  // and his own praise pool, so the flip works from day one without ever
+  // spoiling the unicorn's existence early.
+  check('before he is found, a badge flips to Mick himself, not a unicorn spoiler', await page.evaluate(() => {
+    const back = WA_PERSONAL.badgeBack(120);
+    return !WA_PERSONAL.hasFoundUnicorn() &&
+           back.includes('speech-bubble') && back.includes('img/mick-hoodie.png') &&
+           !back.includes('mick-unicorn.png');
+  }));
+  check('once found, the same badge back switches to the unicorn, and a separate praise pool from his one personal message', await page.evaluate(() => {
+    WA_PERSONAL.markUnicornFound();
+    const back = WA_PERSONAL.badgeBack(120);
+    const seen = new Set();
+    for (let i = 0; i < 30; i++) seen.add(WA_PERSONAL.unicornPraise());
+    const ok = WA_PERSONAL.hasFoundUnicorn() && back.includes('img/mick-unicorn.png') &&
+      seen.size >= 3 && ![...seen].some(s => /Nicole/.test(s));
+    window.WA_PROGRESS.setSetting('foundUnicorn', false);   // leave state as this test found it
+    return ok;
+  }));
 
   /* A real badge celebration, driven straight through the DOM rather than
      the helper functions in isolation — the medallion has to actually render
      and the tap-to-flip has to actually swap the card over in the running
-     app, not just in a function call. */
+     app, not just in a function call. Run pre- and post-discovery so both
+     backs are proven live, not just via the helper functions above. */
   check('an earned badge shows as an official medallion, not a bare floating emoji', await page.evaluate(() => {
     WA_JUICE.celebrate({ kind: 'badge', icon: '\ud83c\udfc5', kicker: 'Badge earned', title: 'Test Badge', button: 'Got it' });
     return !!document.querySelector('.celebrate-icon--medal');
   }));
-  check('tapping the badge card flips it to the unicorn, not tapping the button', await page.evaluate(async () => {
+  check('tapping the badge card before discovery flips it to Mick, not a unicorn spoiler', await page.evaluate(async () => {
     document.querySelector('.flip-stage').click();
     await new Promise(r => setTimeout(r, 400));
     const art = document.querySelector('.celebrate-art');
     return !document.querySelector('.celebrate-icon--medal') &&
-           !!art && art.innerHTML.includes('speech-bubble') && art.innerHTML.includes('mick-unicorn.png');
+           !!art && art.innerHTML.includes('speech-bubble') && art.innerHTML.includes('mick-hoodie.png');
   }));
   await page.click('.celebrate-btn');
   await page.waitForTimeout(320);
   check('the badge celebration still dismisses normally after being flipped',
     (await page.locator('.celebrate.is-in').count()) === 0);
+
+  check('and after he is found, the same tap-to-flip shows the unicorn instead', await page.evaluate(async () => {
+    WA_PERSONAL.markUnicornFound();
+    WA_JUICE.celebrate({ kind: 'badge', icon: '\ud83c\udfc5', kicker: 'Badge earned', title: 'Test Badge 2', button: 'Got it' });
+    await new Promise(r => setTimeout(r, 50));
+    document.querySelector('.flip-stage').click();
+    await new Promise(r => setTimeout(r, 400));
+    const art = document.querySelector('.celebrate-art');
+    const ok = !!art && art.innerHTML.includes('mick-unicorn.png');
+    window.WA_PROGRESS.setSetting('foundUnicorn', false);
+    return ok;
+  }));
+  await page.click('.celebrate-btn');
+  await page.waitForTimeout(320);
 
   check("the unicorn egg uses Mick's own character, not my stand-in",
     await page.evaluate(() => {
@@ -898,8 +973,12 @@ function check(name, cond, extra) {
   await page.waitForSelector('.note', { timeout: 3000 }).catch(() => {});
   check('three long presses on her name open the note',
     (await page.locator('.note').count()) === 1);
+  // Checked against the note's own text, not the word "unicorn" — that was
+  // only ever a coincidental proxy, and foundUnicorn is now a real, deliberately
+  // saved flag of its own (so the peek does not keep asking after she has
+  // already found him), unrelated to whether the note itself gets logged.
   check('the note leaves no trace in saved progress', await page.evaluate(() =>
-    !JSON.stringify(WA_PROGRESS.state).toLowerCase().includes('unicorn') &&
+    !JSON.stringify(WA_PROGRESS.state).toLowerCase().includes('average bear') &&
     WA_PROGRESS.settings().note === undefined));
   await shot(page, '26-note.png');
   await page.click('.note-x');

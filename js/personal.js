@@ -78,6 +78,26 @@ window.WA_PERSONAL = (function () {
 
   function unicorn() { return UNICORN; }
 
+  /* Whether she has actually found him yet. Unlocking (finishing the first
+     unit) and finding (tapping the peek on the home screen) are different
+     things on purpose — the celebration used to fire automatically the
+     instant she finished the lesson, which is not really "finding"
+     anything. Persisted the same way sync/dolls settings are. */
+  function hasFoundUnicorn() { return !!window.WA_PROGRESS.settings().foundUnicorn; }
+  function markUnicornFound() { window.WA_PROGRESS.setSetting('foundUnicorn', true); }
+
+  /* A small hint on the home screen once she has unlocked him — a corner of
+     the hero's own background glow, low contrast, easy to look past and not
+     find straight away, but always there once it can be. This is the drawn
+     icon, not his photo: the photo is what she gets shown once she actually
+     taps it, so finding it is a reveal rather than a preview. */
+  function unicornPeekHtml(size) {
+    var w = size || 30;
+    return '<button class="unicorn-peek" id="unicornPeek" aria-label="?" title="">' +
+      unicornArt(w) + '</button>';
+  }
+
+
   /* The drawn fallback. Kept small and simple on purpose — it only ever
    * shows if the real photo below fails to load, so its job is "something
    * rather than a blank box", not to compete with his actual art. */
@@ -205,8 +225,25 @@ window.WA_PERSONAL = (function () {
 
   function unicornPraise() { return pick(BADGE_PRAISE); }
 
+  /* His own praise, in his own cartoon, for a badge flip before she has
+     found the unicorn. Once she has, the unicorn takes over the back —
+     "use this character in both outfits", so both actually get used rather
+     than the unicorn spoiling itself by turning up everywhere from day one. */
+  var MICK_PRAISE = [
+    'Nice one. That is another one down.',
+    'Good stuff. Keep at it.',
+    "That's the way. Onto the next.",
+    'Proud of you for this one.'
+  ];
+
+  function mickPraise() { return pick(MICK_PRAISE); }
+
+
   function badgeBack(size) {
-    return speechBubble(unicornPraise(), unicornCharacter(size || 130));
+    var w = size || 130;
+    return hasFoundUnicorn()
+      ? speechBubble(unicornPraise(), unicornCharacter(w))
+      : speechBubble(mickPraise(), mickCharacter(w));
   }
 
   /* --------------------------------------------------------------- wiring
@@ -256,6 +293,10 @@ window.WA_PERSONAL = (function () {
     encouragement: encouragement,
     unicornPraise: unicornPraise,
     badgeBack: badgeBack,
+    hasFoundUnicorn: hasFoundUnicorn,
+    markUnicornFound: markUnicornFound,
+    unicornPeekHtml: unicornPeekHtml,
+    mickPraise: mickPraise,
     isUnicornLesson: isUnicornLesson,
     attachHiddenNote: attachHiddenNote,
     HOLD_MS: HOLD_MS,

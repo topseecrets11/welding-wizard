@@ -94,6 +94,33 @@ window.WA_DOLLS = (function () {
     return dolls.filter(function (d) { return !has(d.id); })[0] || null;
   }
 
+  /* ---------------------------------------------------------- peeking
+   * "More prominent... in various places... or just flashing on the
+   * screen" — a doll turning up in a corner of whatever page she is on,
+   * separate from the tidy strip on Home. The decision logic lives here as
+   * a real, pure-ish function (not buried in a UI closure) so it can be
+   * proven correct directly: given a route, the current time and when one
+   * last fired, would this navigation show one — with the coin flip itself
+   * as an injectable argument so a test never has to fight real
+   * randomness or real timers to prove the gating is right. */
+  var PEEK_COOLDOWN_MS = 45000;
+  var PEEK_CHANCE = 0.35;
+
+  function shouldPeek(route, now, lastPeekAt, roll) {
+    if (progress().have >= progress().total) return false;      // nothing left to hunt
+    if (!route || route === 'home') return false;                // the full strip already lives there
+    if (now - lastPeekAt < PEEK_COOLDOWN_MS) return false;
+    var r = (typeof roll === 'number') ? roll : Math.random();
+    return r < PEEK_CHANCE;
+  }
+
+  /* The locked/silhouette treatment, same as everywhere else an unearned
+     doll shows — tapping it is a hint towards the collection, not a
+     shortcut to unlocking one for free. */
+  function peekHtml(doll, size) {
+    return svg(doll, { width: size || 34, locked: true, suffix: 'peek' });
+  }
+
   /* ------------------------------------------------------------------ art */
 
   /* One doll, drawn to a 100x150 box. Unearned ones render as a silhouette so
@@ -170,6 +197,8 @@ window.WA_DOLLS = (function () {
   return {
     dolls: dolls, byId: byId,
     owned: owned, has: has, grant: grant, earned: earned, check: check,
-    progress: progress, nextUp: nextUp, svg: svg
+    progress: progress, nextUp: nextUp, svg: svg,
+    shouldPeek: shouldPeek, peekHtml: peekHtml,
+    PEEK_COOLDOWN_MS: PEEK_COOLDOWN_MS, PEEK_CHANCE: PEEK_CHANCE
   };
 })();
