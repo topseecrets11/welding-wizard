@@ -32,6 +32,7 @@
   var DL = window.WA_DOLLS;
   var PERSONAL = window.WA_PERSONAL;
   var SY = window.WA_SYNC;
+  var OM = window.WA_OLDMATE;
 
   var view, header, tabbar, toastHost;
   var autoReadTimer = null;        // pending auto-start of the reader
@@ -1023,7 +1024,7 @@
         J.celebrate({
           kind: 'complete',
           character: 'unicorn',
-          icon: PERSONAL.unicorn().emoji,
+          art: PERSONAL.unicornArt(132),
           kicker: 'First unit done',
           title: PERSONAL.unicorn().line,
           button: '🦄'
@@ -1390,9 +1391,10 @@
 
     view.innerHTML =
       '<div class="mate-head">' +
-        '<div class="mate-face">👷</div>' +
+        '<div class="mate-face">' + OM.portrait(72, { id: 'dx' }) + '</div>' +
         '<div><h1>Ask Old Mate</h1>' +
-        '<p>Been welding since before you were born. Tell him what you can see, hear or remember — you do not need to know the names, that is his end.</p></div>' +
+        '<p class="mate-cred">Forty years on the tools. Most of it spent fixing what other people welded.</p>' +
+        '<p>Tell him what you can see, hear or remember. You do not need the right words for it — the names are his end of the job.</p></div>' +
       '</div>' +
       askCardHtml() +
       (V.isConfigured() ? cameraCardHtml() : '') +

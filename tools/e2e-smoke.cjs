@@ -242,6 +242,25 @@ function check(name, cond, extra) {
   await page.goto(APP + '#/doctor');
   await page.waitForSelector('.clue');
   check('it is Old Mate, not a doctor', (await page.textContent('.mate-head h1')).includes('Old Mate'));
+
+  // He was a 👷 emoji, which is the look of a classified ad rather than of
+  // someone worth driving to see. A drawn portrait is the fix, and it has to
+  // stay drawn — an emoji creeping back in is the regression this catches.
+  check('Old Mate is a drawn portrait, not an emoji',
+    await page.evaluate(() => {
+      const f = document.querySelector('.mate-face');
+      return !!f && !!f.querySelector('svg.oldmate') && !/\p{Extended_Pictographic}/u.test(f.textContent);
+    }));
+  check('the arc in his lens is her accent colour, so he recolours with the app',
+    await page.evaluate(() => {
+      const svg = document.querySelector('.mate-face svg.oldmate');
+      return !!svg && svg.innerHTML.includes('var(--accent)');
+    }));
+  check('his forty years are stated once, quietly, not sold',
+    await page.evaluate(() => {
+      const c = document.querySelector('.mate-cred');
+      return !!c && /forty years/i.test(c.textContent) && c.textContent.length < 110;
+    }));
   check('no "Weld Doctor" left in the UI',
     !(await page.evaluate(() => document.body.innerText)).match(/weld doctor/i));
   check('all clues rendered', (await page.locator('.clue').count()) === 15);
@@ -764,6 +783,13 @@ function check(name, cond, extra) {
       !WA_PERSONAL.isUnicornLesson('safety', first) &&
       !WA_PERSONAL.isUnicornLesson('smaw', last);
   }));
+  // The one wink in the app was a bare 🦄, which made it look like every other
+  // emoji in here rather than like something put there on purpose.
+  check('the unicorn is actually drawn, and picks up her colours', await page.evaluate(() => {
+    const art = WA_PERSONAL.unicornArt(120);
+    return /^<svg/.test(art) && art.includes('var(--accent)') && art.includes('</svg>');
+  }));
+
   check('the hidden note needs a deliberate long press, not a tap', await page.evaluate(() =>
     WA_PERSONAL.HOLD_MS >= 500 && WA_PERSONAL.HOLDS_NEEDED >= 3));
 

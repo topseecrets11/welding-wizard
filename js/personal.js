@@ -62,7 +62,73 @@ window.WA_PERSONAL = (function () {
     return m.lessons[m.lessons.length - 1].id === lessonId;
   }
 
-  var UNICORN = { emoji: '🦄', line: "Who's a sexy unicorn 🦄" };
+  var UNICORN = { emoji: '🦄', line: "Who's a sexy unicorn \u{1F984}" };
+
+  /* The drawing. It was a bare emoji, which made the one wink in the whole app
+     look like every other emoji in it. Inline SVG like the dolls, so it is
+     sharp at any size and the mane picks up her accent colour — and it is in
+     THIS file, so Mick can drop his own art in over the top without touching
+     app code. Pass it to celebrate() as `art`. */
+  function unicornArt(size) {
+    var w = size || 132;
+    return '<svg viewBox="0 0 120 120" width="' + w + '" height="' + w + '" ' +
+        'role="img" aria-label="A unicorn">' +
+      '<defs>' +
+        '<linearGradient id="uMane" x1="1" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#f6c2e0"/>' +
+          '<stop offset="0.55" stop-color="var(--accent)"/>' +
+          '<stop offset="1" stop-color="#8e5bd6"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="uCoat" x1="0.2" y1="1" x2="0.8" y2="0">' +
+          '<stop offset="0" stop-color="#cfc0dd"/>' +
+          '<stop offset="0.5" stop-color="#f2ecf7"/>' +
+          '<stop offset="1" stop-color="#ffffff"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="uHorn" x1="0" y1="1" x2="1" y2="0">' +
+          '<stop offset="0" stop-color="#c98f22"/>' +
+          '<stop offset="0.5" stop-color="#ffd76b"/>' +
+          '<stop offset="1" stop-color="#b7791a"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+
+      /* mane, layered behind everything */
+      '<path fill="url(#uMane)" opacity=".9" d="M70 26 C90 30 104 48 101 70 ' +
+        'C98 92 84 106 66 111 C79 98 87 82 85 65 C83 48 78 36 70 26 Z"/>' +
+      '<path fill="url(#uMane)" opacity=".55" d="M64 24 C82 34 92 52 89 70 ' +
+        'C86 88 74 100 58 105 C70 92 76 78 74 62 C72 46 68 33 64 24 Z"/>' +
+
+      /* head and neck */
+      '<path fill="url(#uCoat)" d="M24 70 C28 53 39 40 52 31 ' +
+        'C58 27 65 27 69 32 C76 39 80 51 78 63 C76 76 68 87 55 90 ' +
+        'C44 92 33 87 28 80 C25 76 23 73 24 70 Z"/>' +
+
+      /* muzzle shading, nostril, mouth */
+      '<path fill="#d9cbe6" opacity=".7" d="M24 70 C27 62 32 56 38 51 ' +
+        'C34 60 31 68 31 77 C28 76 25 73 24 70 Z"/>' +
+      '<ellipse cx="31" cy="70" rx="2.6" ry="3.4" fill="#8d7aa0" transform="rotate(-18 31 70)"/>' +
+      '<path stroke="#8d7aa0" stroke-width="1.6" fill="none" stroke-linecap="round" d="M27 78 q5 2 9 -1"/>' +
+
+      /* the eye, with the lashes doing all the work */
+      '<ellipse cx="52" cy="52" rx="4.6" ry="5.2" fill="#241a2e" transform="rotate(-12 52 52)"/>' +
+      '<circle cx="53.6" cy="50" r="1.5" fill="#fff" opacity=".9"/>' +
+      '<path stroke="#241a2e" stroke-width="2" fill="none" stroke-linecap="round" ' +
+        'd="M46 45 q6 -5 13 -2 M45 42 l-4 -3 M50 40 l-2 -4 M56 40 l1 -4"/>' +
+
+      /* ear */
+      '<path fill="url(#uCoat)" d="M70 32 C74 22 81 19 84 23 C86 29 80 36 74 37 Z"/>' +
+      '<path fill="#c9b8da" d="M73 32 C76 26 80 24 81 26 C82 30 78 34 75 35 Z"/>' +
+
+      /* the horn */
+      '<path fill="url(#uHorn)" d="M60 30 L69 1 L76 29 Z"/>' +
+      '<path stroke="#8a5f10" stroke-width="1.1" fill="none" opacity=".55" stroke-linecap="round" ' +
+        'd="M62 25 l12 -1 M64 19 l9 -1 M66 13 l6 -1"/>' +
+
+      /* a bit of sparkle, because that is the entire point of the joke */
+      '<path fill="var(--accent)" d="M96 22 l1.8 4.4 4.4 1.8 -4.4 1.8 -1.8 4.4 -1.8 -4.4 -4.4 -1.8 4.4 -1.8 Z"/>' +
+      '<path fill="var(--accent)" opacity=".7" d="M18 34 l1.2 3 3 1.2 -3 1.2 -1.2 3 -1.2 -3 -3 -1.2 3 -1.2 Z"/>' +
+      '<path fill="#fff" opacity=".8" d="M88 100 l1 2.6 2.6 1 -2.6 1 -1 2.6 -1 -2.6 -2.6 -1 2.6 -1 Z"/>' +
+    '</svg>';
+  }
 
   function unicorn() { return UNICORN; }
 
@@ -118,6 +184,7 @@ window.WA_PERSONAL = (function () {
   return {
     note: note,
     unicorn: unicorn,
+    unicornArt: unicornArt,
     isUnicornLesson: isUnicornLesson,
     unitNote: unitNote,
     attachHiddenNote: attachHiddenNote,

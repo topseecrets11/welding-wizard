@@ -853,10 +853,17 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 
 .mate-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
 .mate-face {
-  width: 58px; height: 58px; flex: none; display: grid; place-items: center; font-size: 30px;
-  border-radius: 50%; background: linear-gradient(160deg, #33260f, var(--card));
+  width: 72px; height: 72px; flex: none; display: grid; place-items: center;
+  border-radius: 50%; overflow: hidden;
   border: 1px solid rgba(var(--accent-glow),.45);
   box-shadow: 0 0 22px rgba(var(--accent-glow),.16);
+}
+.mate-face .oldmate { display: block; }
+/* His forty years, stated once and quietly. Louder than this and it reads as
+   a sales pitch, which is the exact thing it is there to avoid. */
+.mate-cred {
+  margin: 0 0 6px !important; font-size: 12px; font-weight: 700;
+  letter-spacing: .3px; color: var(--accent); opacity: .9;
 }
 .mate-head h1 { font-size: 25px; margin: 2px 0 4px; letter-spacing: -.5px; }
 .mate-head p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
