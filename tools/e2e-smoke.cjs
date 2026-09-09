@@ -812,6 +812,62 @@ function check(name, cond, extra) {
   // emoji in here rather than like something put there on purpose.
   // Mick's own character art, with the drawn one kept as the fallback so a
   // failed image load leaves a celebration with something in it, not a gap.
+  // His actual words now, not a placeholder — drawn as the unicorn's own
+  // speech bubble rather than app copy, so it reads as him saying it.
+  check("the unicorn speaks his real message, not a placeholder",
+    await page.evaluate(() => {
+      const html = WA_PERSONAL.unicornSpeech(150);
+      return html.includes('speech-bubble') && /Nicole/.test(html) &&
+             !/[Pp]laceholder/.test(html);
+    }));
+  // A rotating pool now, not one line per unit — the per-unit version left
+  // most units silent. Every module gets him, and it is not always the same
+  // line, so a real spread of his own wording actually exists.
+  check("Mick's unit encouragement is a real rotating pool, not a lookup that leaves units silent",
+    await page.evaluate(() => {
+      const seen = new Set();
+      for (let i = 0; i < 40; i++) seen.add(WA_PERSONAL.encouragement());
+      return seen.size >= 4 && [...seen].every(s => s.length > 0);
+    }));
+  // Mick's own hoodie cartoon, wherever he turns up to say something to her
+  // directly — separate art from the unicorn.
+  check("Mick's own cartoon is used for his encouragement, not the unicorn's",
+    await page.evaluate(() => {
+      const html = WA_PERSONAL.mickCharacter(150);
+      return /<img/.test(html) && html.includes('img/mick-hoodie.png') && /onerror=/.test(html);
+    }));
+  // Every badge can be turned over to the unicorn saying he is proud — a
+  // separate pool from his one personal message to her, since this one fires
+  // on every single badge and has to hold up to being seen a lot.
+  check('a badge has a flippable back with the unicorn praising her, distinct from his one personal message',
+    await page.evaluate(() => {
+      const back = WA_PERSONAL.badgeBack(120);
+      const seen = new Set();
+      for (let i = 0; i < 30; i++) seen.add(WA_PERSONAL.unicornPraise());
+      return back.includes('speech-bubble') && back.includes('img/mick-unicorn.png') &&
+             seen.size >= 3 && ![...seen].some(s => /Nicole/.test(s));
+    }));
+
+  /* A real badge celebration, driven straight through the DOM rather than
+     the helper functions in isolation — the medallion has to actually render
+     and the tap-to-flip has to actually swap the card over in the running
+     app, not just in a function call. */
+  check('an earned badge shows as an official medallion, not a bare floating emoji', await page.evaluate(() => {
+    WA_JUICE.celebrate({ kind: 'badge', icon: '\ud83c\udfc5', kicker: 'Badge earned', title: 'Test Badge', button: 'Got it' });
+    return !!document.querySelector('.celebrate-icon--medal');
+  }));
+  check('tapping the badge card flips it to the unicorn, not tapping the button', await page.evaluate(async () => {
+    document.querySelector('.flip-stage').click();
+    await new Promise(r => setTimeout(r, 400));
+    const art = document.querySelector('.celebrate-art');
+    return !document.querySelector('.celebrate-icon--medal') &&
+           !!art && art.innerHTML.includes('speech-bubble') && art.innerHTML.includes('mick-unicorn.png');
+  }));
+  await page.click('.celebrate-btn');
+  await page.waitForTimeout(320);
+  check('the badge celebration still dismisses normally after being flipped',
+    (await page.locator('.celebrate.is-in').count()) === 0);
+
   check("the unicorn egg uses Mick's own character, not my stand-in",
     await page.evaluate(() => {
       const html = WA_PERSONAL.unicornCharacter(170);

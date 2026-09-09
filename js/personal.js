@@ -3,11 +3,6 @@
  * ----------------------------------------------------------------------------
  * The things in this app that are from Mick rather than from Old Mate.
  *
- * EVERYTHING IN HERE IS A SLOT, NOT A SCRIPT. The wording below is placeholder
- * — deliberately plain and easy to spot — and it is all in one file so it can
- * be replaced without touching a line of app code. Anything personal is his to
- * write; the job here was to build the places for it to live.
- *
  * WHAT IS WIRED UP
  *
  *   HIDDEN NOTE     Press and hold her name on the home screen for two seconds,
@@ -19,20 +14,37 @@
  *
  *   UNICORN TILE    The tile that closes out her very first unit only. One
  *                   wink, in one place, so it reads as a wink and not a
- *                   running bit.
+ *                   running bit — his own art, striking a pose, with his own
+ *                   words in a speech bubble coming from it.
  *
- *   MICK CELEBRATES Finishing a whole unit gets the Mr Moneybags treatment
- *                   rather than another badge card — the character slot is
- *                   `character: 'mick'` on the celebration, so dropping real
- *                   art in later is a content change, not a code change.
+ *   MICK CELEBRATES Finishing a whole unit gets him turning up in his own
+ *                   cartoon — the character slot is `character: 'mick'` on
+ *                   the celebration — with a rotating line of encouragement
+ *                   rather than a script written per unit, so every unit gets
+ *                   him, not just the ones that happened to get written.
+ *
+ *   BADGE BACKS     Every badge celebration can be flipped — the front is the
+ *                   badge itself, the back is the unicorn, in his own art,
+ *                   saying he's proud. Tap the card, not the button, to see it.
+ *
+ * The wording that is still a placeholder is marked PLACEHOLDER below and
+ * nowhere else — everything else here is real content he supplied.
  * ==========================================================================*/
 
 window.WA_PERSONAL = (function () {
   'use strict';
 
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
   /* --------------------------------------------------------- the hidden note
-   * Replace the lines below with whatever he wants it to say. It renders as
-   * paragraphs in order, so one string per paragraph. */
+   * PLACEHOLDER — replace the lines below with whatever he wants it to say.
+   * It renders as paragraphs in order, so one string per paragraph. */
   var NOTE = {
     signoff: '— M',
     lines: [
@@ -64,11 +76,11 @@ window.WA_PERSONAL = (function () {
 
   var UNICORN = { emoji: '🦄', line: "Who's a sexy unicorn \u{1F984}" };
 
-  /* The drawing. It was a bare emoji, which made the one wink in the whole app
-     look like every other emoji in it. Inline SVG like the dolls, so it is
-     sharp at any size and the mane picks up her accent colour — and it is in
-     THIS file, so Mick can drop his own art in over the top without touching
-     app code. Pass it to celebrate() as `art`. */
+  function unicorn() { return UNICORN; }
+
+  /* The drawn fallback. Kept small and simple on purpose — it only ever
+   * shows if the real photo below fails to load, so its job is "something
+   * rather than a blank box", not to compete with his actual art. */
   function unicornArt(size) {
     var w = size || 132;
     return '<svg viewBox="0 0 120 120" width="' + w + '" height="' + w + '" ' +
@@ -90,51 +102,36 @@ window.WA_PERSONAL = (function () {
           '<stop offset="1" stop-color="#b7791a"/>' +
         '</linearGradient>' +
       '</defs>' +
-
-      /* mane, layered behind everything */
       '<path fill="url(#uMane)" opacity=".9" d="M70 26 C90 30 104 48 101 70 ' +
         'C98 92 84 106 66 111 C79 98 87 82 85 65 C83 48 78 36 70 26 Z"/>' +
       '<path fill="url(#uMane)" opacity=".55" d="M64 24 C82 34 92 52 89 70 ' +
         'C86 88 74 100 58 105 C70 92 76 78 74 62 C72 46 68 33 64 24 Z"/>' +
-
-      /* head and neck */
       '<path fill="url(#uCoat)" d="M24 70 C28 53 39 40 52 31 ' +
         'C58 27 65 27 69 32 C76 39 80 51 78 63 C76 76 68 87 55 90 ' +
         'C44 92 33 87 28 80 C25 76 23 73 24 70 Z"/>' +
-
-      /* muzzle shading, nostril, mouth */
       '<path fill="#d9cbe6" opacity=".7" d="M24 70 C27 62 32 56 38 51 ' +
         'C34 60 31 68 31 77 C28 76 25 73 24 70 Z"/>' +
       '<ellipse cx="31" cy="70" rx="2.6" ry="3.4" fill="#8d7aa0" transform="rotate(-18 31 70)"/>' +
       '<path stroke="#8d7aa0" stroke-width="1.6" fill="none" stroke-linecap="round" d="M27 78 q5 2 9 -1"/>' +
-
-      /* the eye, with the lashes doing all the work */
       '<ellipse cx="52" cy="52" rx="4.6" ry="5.2" fill="#241a2e" transform="rotate(-12 52 52)"/>' +
       '<circle cx="53.6" cy="50" r="1.5" fill="#fff" opacity=".9"/>' +
       '<path stroke="#241a2e" stroke-width="2" fill="none" stroke-linecap="round" ' +
         'd="M46 45 q6 -5 13 -2 M45 42 l-4 -3 M50 40 l-2 -4 M56 40 l1 -4"/>' +
-
-      /* ear */
       '<path fill="url(#uCoat)" d="M70 32 C74 22 81 19 84 23 C86 29 80 36 74 37 Z"/>' +
       '<path fill="#c9b8da" d="M73 32 C76 26 80 24 81 26 C82 30 78 34 75 35 Z"/>' +
-
-      /* the horn */
       '<path fill="url(#uHorn)" d="M60 30 L69 1 L76 29 Z"/>' +
       '<path stroke="#8a5f10" stroke-width="1.1" fill="none" opacity=".55" stroke-linecap="round" ' +
         'd="M62 25 l12 -1 M64 19 l9 -1 M66 13 l6 -1"/>' +
-
-      /* a bit of sparkle, because that is the entire point of the joke */
       '<path fill="var(--accent)" d="M96 22 l1.8 4.4 4.4 1.8 -4.4 1.8 -1.8 4.4 -1.8 -4.4 -4.4 -1.8 4.4 -1.8 Z"/>' +
       '<path fill="var(--accent)" opacity=".7" d="M18 34 l1.2 3 3 1.2 -3 1.2 -1.2 3 -1.2 -3 -3 -1.2 3 -1.2 Z"/>' +
       '<path fill="#fff" opacity=".8" d="M88 100 l1 2.6 2.6 1 -2.6 1 -1 2.6 -1 -2.6 -2.6 -1 2.6 -1 Z"/>' +
     '</svg>';
   }
 
-  /* MICK'S OWN ART. The drawn unicorn above was a stand-in until he handed
-     over the real thing — this is his character, the Stealth Terminator
-     Unicorn, and it is the actual joke rather than my approximation of it.
-     The drawing stays as the fallback: if the file ever fails to load the
-     celebration still has something to show rather than an empty box. */
+  /* MICK'S OWN ART — the unicorn, mid laugh, one hand up. His real character
+   * sheet, cropped clean, not the placeholder crop from the first pass. The
+   * drawing above stays as the onerror fallback: if the file ever fails to
+   * load, the celebration still has something to show. */
   var UNICORN_IMG = 'img/mick-unicorn.png';
 
   function unicornCharacter(size) {
@@ -143,19 +140,74 @@ window.WA_PERSONAL = (function () {
       'onerror="this.outerHTML=WA_PERSONAL.unicornArt(' + w + ')">';
   }
 
-  function unicorn() { return UNICORN; }
+  /* His own hoodie cartoon, pointing — the one that turns up wherever Mick
+   * has something to say to her directly, separate from the unicorn bit. No
+   * drawn fallback exists for his own likeness, so a failed load just drops
+   * the image and leaves the words to carry it, same as an icon that never
+   * rendered. */
+  var MICK_IMG = 'img/mick-hoodie.png';
 
-  /* --------------------------------------------------- Mick's unit sign-offs
-   * Shown under the unit-complete celebration. One per unit where there is
-   * something to say, and nothing where there is not — an empty string just
-   * leaves the celebration as Old Mate's. */
-  var UNIT_NOTES = {
-    safety: 'First one down. Told you.',
-    smaw:   'You can strike an arc now. That is a real thing to be able to do.',
-    salvage: 'This is the one that pays for itself.'
-  };
+  function mickCharacter(size) {
+    var w = size || 150;
+    return '<img class="mick-char" src="' + MICK_IMG + '" alt="" width="' + w + '" onerror="this.remove()">';
+  }
 
-  function unitNote(moduleId) { return UNIT_NOTES[moduleId] || ''; }
+  /* --------------------------------------------------------- the message
+   * His words, on the unicorn Easter egg specifically — a speech bubble
+   * coming from the character rather than another line of celebration copy,
+   * so it reads as him saying it in his own moment, not the app talking. */
+  var UNICORN_MESSAGE = 'I believe in you Nicole, you give me strength to strive for more and I will always love you!';
+
+  function speechBubble(text, figureHtml) {
+    return '<div class="unicorn-speech">' +
+      '<div class="speech-bubble"><p>' + esc(text) + '</p></div>' +
+      '<div class="unicorn-figure">' + figureHtml + '</div>' +
+    '</div>';
+  }
+
+  function unicornSpeech(size) {
+    return speechBubble(UNICORN_MESSAGE, unicornCharacter(size || 150));
+  }
+
+  /* --------------------------------------------------- Mick's encouragement
+   * A rotating pool rather than one line per unit — the per-unit version left
+   * eight of eleven units silent, because writing a unique line for every
+   * single one is a big ask to keep up with as units get added. This way
+   * every unit gets him, and it does not go stale on the second lap either
+   * since it is drawn fresh each time rather than fixed to what she is
+   * finishing. */
+  var ENCOURAGEMENT = [
+    'First one down. Told you.',
+    'You can strike an arc now. That is a real thing to be able to do.',
+    'This is the one that pays for itself.',
+    'Proud of you for this one. Keep going.',
+    'That is real work, that. Nobody can take it off you now.',
+    'You turned up and did it. That is the whole trick, and you keep doing it.',
+    'Another one in the bank. This is how it adds up.',
+    'Told you you could. Onto the next.'
+  ];
+
+  function encouragement() { return pick(ENCOURAGEMENT); }
+
+  /* ------------------------------------------------------ badge backs
+   * Every badge she earns can be flipped over — the unicorn, on the back,
+   * saying he's proud. A separate pool from the unicorn's one personal
+   * message above; that one is his and hers alone, this is what fires on
+   * every single badge, so it has to hold up to being seen a lot. */
+  var BADGE_PRAISE = [
+    "Well done. I'm proud of you.",
+    "That's another one. Look at you go.",
+    "Proud as punch, this unicorn.",
+    "Knew you had it in you.",
+    "That's the stuff. Keep collecting them.",
+    "Nice one. Onto the next."
+  ];
+
+  function unicornPraise() { return pick(BADGE_PRAISE); }
+
+  function badgeBack(size) {
+    return speechBubble(unicornPraise(), unicornCharacter(size || 130));
+  }
 
   /* --------------------------------------------------------------- wiring
    * Attaches the press-and-hold to an element. Returns a teardown function.
@@ -199,8 +251,12 @@ window.WA_PERSONAL = (function () {
     unicorn: unicorn,
     unicornArt: unicornArt,
     unicornCharacter: unicornCharacter,
+    unicornSpeech: unicornSpeech,
+    mickCharacter: mickCharacter,
+    encouragement: encouragement,
+    unicornPraise: unicornPraise,
+    badgeBack: badgeBack,
     isUnicornLesson: isUnicornLesson,
-    unitNote: unitNote,
     attachHiddenNote: attachHiddenNote,
     HOLD_MS: HOLD_MS,
     HOLDS_NEEDED: HOLDS_NEEDED

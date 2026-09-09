@@ -246,10 +246,33 @@ window.WA_JUICE = (function () {
     if (!showing) next();
   }
 
+  /* Every plain badge (not a unit or level, which already have their own big
+     moment) can be turned over — tap the card, not the button — to find the
+     unicorn on the back saying he is proud. Content is swapped rather than a
+     true two-sided 3D flip, so it never has to fight a fixed height against
+     whatever the front happens to be showing. */
+  function frontHtml(o, flippable) {
+    return (o.art ? '<div class="celebrate-art">' + o.art + '</div>'
+                  : '<div class="celebrate-icon' + (flippable ? ' celebrate-icon--medal' : '') + '">' +
+                      (o.icon || '🏅') + '</div>') +
+      '<div class="celebrate-kicker">' + (o.kicker || '') + '</div>' +
+      '<div class="celebrate-title">' + (o.title || '') + '</div>' +
+      (o.subtitle ? '<div class="celebrate-sub">' + o.subtitle + '</div>' : '') +
+      (o.note ? '<div class="celebrate-note">' + o.note + '</div>' : '') +
+      (flippable ? '<p class="flip-hint">Tap to flip 🦄</p>' : '') +
+      '<button class="btn btn--primary celebrate-btn">' + (o.button || 'Nice') + '</button>';
+  }
+  function backHtml(o) {
+    return '<div class="celebrate-art">' + window.WA_PERSONAL.badgeBack(120) + '</div>' +
+      '<div class="celebrate-kicker">From the unicorn</div>' +
+      '<button class="btn btn--primary celebrate-btn">' + (o.button || 'Nice') + '</button>';
+  }
+
   function next() {
     if (!queue.length) { showing = false; return; }
     showing = true;
     var o = queue.shift();
+    var flippable = (o.kind || 'badge') === 'badge' && !o.art && !!window.WA_PERSONAL;
 
     var wrap = document.createElement('div');
     wrap.className = 'celebrate celebrate--' + (o.kind || 'badge') +
@@ -257,16 +280,7 @@ window.WA_JUICE = (function () {
     wrap.innerHTML =
       '<div class="celebrate-card">' +
         '<div class="celebrate-glow"></div>' +
-        // `art` takes an SVG string for anything with a real picture (the
-        // dolls); `icon` is the emoji fallback. `character` only adds a class,
-        // so a skin can be dropped in later without touching this.
-        (o.art ? '<div class="celebrate-art">' + o.art + '</div>'
-               : '<div class="celebrate-icon">' + (o.icon || '🏅') + '</div>') +
-        '<div class="celebrate-kicker">' + (o.kicker || '') + '</div>' +
-        '<div class="celebrate-title">' + (o.title || '') + '</div>' +
-        (o.subtitle ? '<div class="celebrate-sub">' + o.subtitle + '</div>' : '') +
-        (o.note ? '<div class="celebrate-note">' + o.note + '</div>' : '') +
-        '<button class="btn btn--primary celebrate-btn">' + (o.button || 'Nice') + '</button>' +
+        '<div class="flip-stage">' + frontHtml(o, flippable) + '</div>' +
       '</div>';
     document.body.appendChild(wrap);
     requestAnimationFrame(function () { wrap.classList.add('is-in'); });
@@ -281,6 +295,9 @@ window.WA_JUICE = (function () {
     sound(o.kind === 'level' ? 'level' : o.kind === 'complete' ? 'complete' : 'badge');
     haptic(o.kind === 'level' ? 'level' : 'badge');
 
+    var card = wrap.querySelector('.celebrate-card');
+    var stage = wrap.querySelector('.flip-stage');
+
     function close() {
       wrap.classList.remove('is-in');
       setTimeout(function () {
@@ -288,7 +305,32 @@ window.WA_JUICE = (function () {
         next();
       }, 280);
     }
-    wrap.querySelector('.celebrate-btn').addEventListener('click', close);
+    function wireStage() {
+      var btn = stage.querySelector('.celebrate-btn');
+      if (btn) btn.addEventListener('click', function (e) { e.stopPropagation(); close(); });
+    }
+    wireStage();
+
+    if (flippable) {
+      var showingBack = false;
+      stage.addEventListener('click', function (e) {
+        if (e.target.closest('.celebrate-btn')) return;
+        if (reduced) { showingBack = !showingBack; stage.innerHTML = showingBack ? backHtml(o) : frontHtml(o, true); wireStage(); return; }
+        showingBack = !showingBack;
+        card.style.transition = 'transform .15s ease-in';
+        card.style.transform = 'scaleX(.02)';
+        setTimeout(function () {
+          stage.innerHTML = showingBack ? backHtml(o) : frontHtml(o, true);
+          wireStage();
+          card.style.transition = 'none';
+          requestAnimationFrame(function () {
+            card.style.transition = 'transform .18s cubic-bezier(.2,.8,.3,1.2)';
+            card.style.transform = 'scaleX(1)';
+          });
+        }, 150);
+      });
+    }
+
     wrap.addEventListener('click', function (e) { if (e.target === wrap) close(); });
   }
 

@@ -231,11 +231,12 @@
       J.celebrate({
         kind: 'complete',
         character: 'mick',
+        art: PERSONAL.mickCharacter(150),
         icon: '💰',
         kicker: 'Unit complete',
         title: mod ? mod.title : 'Unit done',
         subtitle: PF.line('unit'),
-        note: PERSONAL.unitNote(result.moduleComplete),
+        note: PERSONAL.encouragement(),
         button: 'Cheers'
       });
     }
@@ -1025,7 +1026,7 @@
         J.celebrate({
           kind: 'complete',
           character: 'unicorn',
-          art: PERSONAL.unicornCharacter(170),
+          art: PERSONAL.unicornSpeech(150),
           kicker: 'First unit done',
           title: PERSONAL.unicorn().line,
           button: '🦄'
