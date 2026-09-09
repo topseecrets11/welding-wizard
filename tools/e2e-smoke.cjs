@@ -898,6 +898,33 @@ function check(name, cond, extra) {
   await dismiss(page);
 
   /* ---------- Old Mate's voice ---------- */
+  /* THE ROBOT BUG. The old pickVoice() preferred v.localService, which reads
+     as "works in a shed with no signal" and is in fact "pick the compact
+     Android voice", i.e. the worst-sounding one on the phone, every time.
+     These lock the labelling and the ordering the fix depends on. */
+  check('a network voice is called natural, a local one is called robotic',
+    await page.evaluate(() => {
+      const net = WA_NARRATOR.describe({ name: 'en-au-x-aub-network', lang: 'en-AU', localService: false });
+      const loc = WA_NARRATOR.describe({ name: 'en-au-x-aub-local', lang: 'en-AU', localService: true });
+      return net.natural === true && /natural/.test(net.quality) &&
+             loc.natural === false && /robotic/.test(loc.quality) && /offline/.test(loc.quality);
+    }));
+  check('android voice codes are read for gender, not just plain-English names',
+    await page.evaluate(() => {
+      const d = WA_NARRATOR.describe;
+      return d({ name: 'en-gb-x-gbb-network', lang: 'en-GB', localService: false }).gender === 'male' &&
+             d({ name: 'en-gb-x-gbc-network', lang: 'en-GB', localService: false }).gender === 'female' &&
+             d({ name: 'Google UK English Male', lang: 'en-GB', localService: false }).gender === 'male';
+    }));
+  check('a voice is described by where it is from, not its engine name',
+    await page.evaluate(() => {
+      const d = WA_NARRATOR.describe;
+      return d({ name: 'en-au-x-aub-network', lang: 'en-AU', localService: false }).accent === 'Australian' &&
+             d({ name: 'en-gb-x-gbb-local', lang: 'en-GB', localService: true }).accent === 'British';
+    }));
+  check('she can be told plainly when the phone has no male voice at all',
+    await page.evaluate(() => typeof WA_NARRATOR.maleVoiceCount() === 'number'));
+
   check('two voice personas offered', (await page.locator('.persona').count()) === 2);
   check('the wise one is the default', await page.evaluate(() => WA_NARRATOR.currentPersona().id === 'wise'));
   check('wise is pitched low and unhurried', await page.evaluate(() => {

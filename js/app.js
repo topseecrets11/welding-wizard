@@ -2432,6 +2432,54 @@
 
   /* ============================ settings ================================ */
 
+  /* The old picker was a dropdown of raw engine names — "en-au-x-aub-network"
+     means nothing to anyone. She picks a voice by listening to it, so every
+     one on the phone gets a row, a plain-English label and its own play
+     button. If the phone genuinely has no male English voice on it then no
+     amount of picking fixes that, so it says so and tells her where to get
+     one rather than quietly handing her a woman's voice for Old Mate. */
+  function voicePickerHtml() {
+    var list = N.voices();
+    if (!list.length) return '';
+    var current = N.currentVoiceName();
+    var males = N.maleVoiceCount();
+
+    var rows = list.map(function (v) {
+      var d = N.describe(v);
+      var tags = [d.accent];
+      if (d.gender !== 'unknown') tags.push(d.gender);
+      tags.push(d.quality);
+      return '<div class="vrow' + (v.name === current ? ' is-on' : '') + '">' +
+          '<button class="vrow-pick" data-voice="' + esc(v.name) + '">' +
+            '<b>' + esc(d.accent) + (d.gender === 'male' ? ' · male' : d.gender === 'female' ? ' · female' : '') + '</b>' +
+            '<i>' + esc(d.quality) + '</i>' +
+          '</button>' +
+          '<button class="vrow-play" data-hear="' + esc(v.name) + '" aria-label="Hear this voice">▶</button>' +
+        '</div>';
+    }).join('');
+
+    return '<div class="field"><span class="field-lbl">Voice</span>' +
+        '<div class="vlist">' +
+          '<div class="vrow' + (current ? '' : ' is-on') + '">' +
+            '<button class="vrow-pick" data-voice=""><b>Let the phone choose</b>' +
+              '<i>picks the most natural English voice it has</i></button>' +
+          '</div>' + rows +
+        '</div>' +
+        (males === 0
+          ? '<div class="card card--warn" style="margin-top:12px">' +
+              '<b>No male English voice on this phone</b>' +
+              '<p>Old Mate is stuck with whatever is installed, and right now that is all ' +
+              'female. To get him a proper voice: <b>Settings → General management → ' +
+              'Text-to-speech</b> (or <b>Accessibility → Text-to-speech</b>), open the ' +
+              'Google engine, then <b>Install voice data → English</b> and pick an ' +
+              'Australian or British male. Come back here and it will be in this list.</p>' +
+            '</div>'
+          : '<p class="muted small">The natural ones need signal and sound like a person. ' +
+            'The offline ones sound like a robot but keep working with no bars — worth ' +
+            'setting one of those before a long drive out of range.</p>') +
+      '</div>';
+  }
+
   function renderSettings() {
     renderTabs('');
     var c = V.config();
@@ -2472,13 +2520,7 @@
           }).join('') +
         '</div>' +
         '<p class="muted small">Your phone decides how many voices it has, so these pick the closest match it can find. Override it below if you would rather.</p>' +
-        '<label class="field"><span>Voice</span><select class="input" id="voicePick">' +
-          '<option value="">Phone default</option>' +
-          N.voices().map(function (v) {
-            return '<option value="' + esc(v.name) + '"' + (v.name === N.currentVoiceName() ? ' selected' : '') + '>' +
-              esc(v.name) + ' (' + esc(v.lang) + ')' + (v.localService ? ' · offline' : '') + '</option>';
-          }).join('') +
-        '</select></label>' +
+        voicePickerHtml() +
         '<label class="field"><span>Speed</span><select class="input" id="ratePick">' +
           [0.8, 1, 1.15, 1.35, 1.6].map(function (r) {
             return '<option value="' + r + '"' + (r === N.getRate() ? ' selected' : '') + '>' + r + '×</option>';
@@ -2699,11 +2741,29 @@
       });
     }
 
-    var voicePick = $('#voicePick');
-    if (voicePick) {
-      voicePick.addEventListener('change', function (e) { N.setVoiceByName(e.target.value); });
-      $('#ratePick').addEventListener('change', function (e) { N.setRate(parseFloat(e.target.value)); });
-      $('#voiceTest').addEventListener('click', function () {
+    var vlist = $('.vlist');
+    if (vlist) {
+      vlist.addEventListener('click', function (e) {
+        var hear = e.target.closest('[data-hear]');
+        if (hear) { tap(); N.sample(hear.getAttribute('data-hear')); return; }
+        var pick = e.target.closest('[data-voice]');
+        if (!pick) return;
+        tap();
+        N.setVoiceByName(pick.getAttribute('data-voice'));
+        vlist.querySelectorAll('.vrow').forEach(function (r) { r.classList.remove('is-on'); });
+        pick.parentNode.classList.add('is-on');
+        // Say something the moment she picks, so choosing and hearing are the
+        // same action rather than two.
+        N.sample(pick.getAttribute('data-voice'));
+      });
+    }
+    var ratePick = $('#ratePick');
+    if (ratePick) {
+      ratePick.addEventListener('change', function (e) { N.setRate(parseFloat(e.target.value)); });
+    }
+    var voiceTest = $('#voiceTest');
+    if (voiceTest) {
+      voiceTest.addEventListener('click', function () {
         N.setScript([{ textContent: 'Hold the arc about one electrode diameter off the work. Too long and you get spatter, a wandering arc, and porosity.' }]);
         N.play(0);
       });

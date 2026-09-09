@@ -93,12 +93,21 @@ window.WA_NARRATOR = (function () {
     emit();
   }
 
-  /* Voice names do not carry a gender flag, so this goes on the names the
-     common Android and desktop engines actually ship. It is a preference,
-     not a guarantee — if nothing matches we fall back to any English voice
-     rather than refusing to read. */
-  var MALE_HINTS = /\b(male|man)\b|\bgoogle uk english male\b|daniel|arthur|oliver|james|george|russell|lee|rishi|alex|fred|aaron|\ben-au-x-aud\b|\ben-gb-x-gbb\b|#male/i;
-  var FEMALE_HINTS = /\b(female|woman)\b|\bgoogle uk english female\b|karen|serena|kate|fiona|moira|tessa|samantha|catherine|\ben-au-x-aua\b|#female/i;
+  /* The Web Speech API exposes no gender field at all, so this reads the names
+     the common engines actually ship. Android's Google voices are named by
+     opaque code — en-au-x-aub-network and the like — and the codes below are
+     the ones observed to be male. It is a best-effort hint and it is wrong on
+     some devices, which is exactly why Settings lets her audition every voice
+     and override it: the picker is the real answer, this only sets the
+     opening guess. */
+  var MALE_HINTS = /\b(male|man)\b|google uk english male|daniel|arthur|oliver|james|george|russell|lee|rishi|alex|fred|aaron|gordon|\bx-(aub|aud|gbb|gbd|iom|tpd)\b|#male/i;
+  var FEMALE_HINTS = /\b(female|woman)\b|google uk english female|karen|serena|kate|fiona|moira|tessa|samantha|catherine|martha|\bx-(aua|auc|gba|gbc|iob|iog|iol|tpc)\b|#female/i;
+
+  /* ANDROID NAMING, SO THE QUALITY SORT BELOW MAKES SENSE.
+     Google's TTS ships each voice twice: "-local" is the small offline one
+     and it is the one that sounds like a robot; "-network" is the natural
+     one. The API reports that split as `localService`. */
+  function isNatural(v) { return !v.localService; }
 
   function pickVoice() {
     if (!synth) return null;
@@ -110,13 +119,21 @@ window.WA_NARRATOR = (function () {
     var hint = want === 'female' ? FEMALE_HINTS : MALE_HINTS;
     var avoid = want === 'female' ? MALE_HINTS : FEMALE_HINTS;
 
-    // Score by: matches the persona, is Australian, is British, works offline.
+    /* QUALITY BEFORE OFFLINE — this was the wrong way round and it is why he
+       sounded like a robot. Preferring localService looks sensible for an app
+       built to work in a shed with no signal, but on Android localService is
+       the compact voice, so the old order picked the worst-sounding option on
+       the phone every single time. Natural first now; the offline ones are
+       still here as the fallback, and Settings labels which is which so she
+       can deliberately pick an offline one before a long drive. */
     function best(list) {
-      return list.filter(function (v) { return /en[-_]AU/i.test(v.lang) && v.localService; })[0]
-          || list.filter(function (v) { return /en[-_]AU/i.test(v.lang); })[0]
-          || list.filter(function (v) { return /en[-_](GB|NZ)/i.test(v.lang) && v.localService; })[0]
-          || list.filter(function (v) { return /en[-_](GB|NZ)/i.test(v.lang); })[0]
-          || list.filter(function (v) { return v.localService; })[0]
+      function pick(langRe) {
+        return list.filter(function (v) { return langRe.test(v.lang) && isNatural(v); })[0]
+            || list.filter(function (v) { return langRe.test(v.lang); })[0];
+      }
+      return pick(/en[-_]AU/i)
+          || pick(/en[-_](GB|NZ)/i)
+          || list.filter(isNatural)[0]
           || list[0];
     }
 
@@ -128,6 +145,51 @@ window.WA_NARRATOR = (function () {
   function voices() {
     if (!synth) return [];
     return (synth.getVoices() || []).filter(function (v) { return /^en/i.test(v.lang); });
+  }
+
+  var ACCENTS = [
+    [/en[-_]AU/i, 'Australian'], [/en[-_]GB/i, 'British'], [/en[-_]NZ/i, 'New Zealand'],
+    [/en[-_]IE/i, 'Irish'], [/en[-_]US/i, 'American'], [/en[-_]CA/i, 'Canadian'],
+    [/en[-_]IN/i, 'Indian'], [/en[-_]ZA/i, 'South African']
+  ];
+
+  /* Raw voice names are things like "en-au-x-aub-network", which tells her
+     nothing. This turns one into the three facts she actually chooses on:
+     where it sounds like it is from, whether it sounds natural, and the
+     best guess at whether it is a bloke. */
+  function describe(v) {
+    var accent = 'English';
+    for (var i = 0; i < ACCENTS.length; i++) {
+      if (ACCENTS[i][0].test(v.lang)) { accent = ACCENTS[i][1]; break; }
+    }
+    return {
+      name: v.name,
+      accent: accent,
+      natural: isNatural(v),
+      quality: isNatural(v) ? 'natural' : 'robotic, works offline',
+      gender: MALE_HINTS.test(v.name) ? 'male'
+            : FEMALE_HINTS.test(v.name) ? 'female' : 'unknown'
+    };
+  }
+
+  /* Settings needs to be able to say "your phone has no male English voice
+     on it" out loud, because when that is true no amount of picking fixes
+     it — she has to install one from the phone's own settings. */
+  function maleVoiceCount() {
+    return voices().filter(function (v) { return MALE_HINTS.test(v.name); }).length;
+  }
+
+  /* Speak one line in a named voice without disturbing whatever is queued —
+     this is what makes the picker an audition rather than a guess. */
+  function sample(name, text) {
+    if (!synth) return;
+    var v = voices().filter(function (x) { return x.name === name; })[0];
+    try { synth.cancel(); } catch (e) { /* ignore */ }
+    var u = new SpeechSynthesisUtterance(text || 'Hold the arc about one electrode diameter off the work, and keep it moving.');
+    if (v) { u.voice = v; u.lang = v.lang; }
+    var p = currentPersona();
+    u.pitch = p.pitch; u.rate = p.rate;
+    synth.speak(u);
   }
 
   function setVoiceByName(name) {
@@ -318,6 +380,7 @@ window.WA_NARRATOR = (function () {
     status: status, progress: progress,
     onChange: onChange, offChange: offChange,
     voices: voices, setVoiceByName: setVoiceByName, currentVoiceName: currentVoiceName,
+    describe: describe, maleVoiceCount: maleVoiceCount, sample: sample,
     setRate: setRate, getRate: getRate,
     personas: personas, setPersona: setPersona, currentPersona: currentPersona
   };
