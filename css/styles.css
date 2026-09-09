@@ -1341,3 +1341,11 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
   border: 0; border-left: 1.5px solid var(--line-2);
 }
 .vrow-play:active { background: rgba(var(--accent-glow), .18); }
+
+/* Mick's own character art on a celebration. Height-capped so a tall figure
+   cannot push the card off a short screen, and never stretched. */
+.mick-char {
+  display: block; margin: 0 auto; height: auto;
+  max-height: 44vh; max-width: 62vw; width: auto;
+  filter: drop-shadow(0 8px 22px rgba(0,0,0,.55));
+}

@@ -148,6 +148,27 @@ window.WA_SCRIPT = (function () {
 
   function diagramLine(id) { return DIAGRAM_WORDS[id] || null; }
 
+  /* The thirteen fault drawings each get spoken words too. Old Mate reads his
+     diagnosis aloud in Drive Mode, where there is no screen to look at — a
+     picture he cannot describe is just silence where the explanation was. */
+  var DEFECT_WORDS = {
+    'porosity': 'Picture the weld sawn through. Porosity shows as round holes running right through the bead, where gas could not escape before it froze. A sound weld is solid all the way.',
+    'undercut': 'Picture the joint sawn through. Undercut is a groove burnt into the parent plate along the edge of the weld, so the plate is thinner there than anywhere else. Done right, the weld blends flush into the plate.',
+    'overlap': 'Picture the joint sawn through. Cold lap is weld metal rolled over onto the surface of the plate without fusing to it, leaving a lip you can catch a fingernail under. Done right, the weld ties in at the toe.',
+    'lack-of-fusion': 'Picture the joint sawn through. The weld filled the gap but never melted into the wall beside it, leaving a dark seam down the side. Nothing shows on the surface, which is what makes it dangerous.',
+    'lack-of-penetration': 'Picture the joint sawn through. The weld stopped short and left a gap at the root, down at the bottom of the joint. Done right, weld metal reaches all the way to the bottom.',
+    'burn-through': 'Picture the joint sawn through. Too much heat for the thickness, so the puddle collapsed and dropped out the underside, leaving a hole where the joint should be.',
+    'hot-crack': 'Picture looking down at the run. A solidification crack runs along the centre of the bead, and often starts in the crater at the end. A sound run has an unbroken crown.',
+    'cold-crack': 'Picture looking down at the run, with a shaded band either side of the weld. That band is the heat-affected zone, and hydrogen cracking turns up in it hours or days after you have packed up.',
+    'distortion': 'Picture a tee joint from the end. The weld shrank as it cooled and dragged the plate around with it, so the upright is no longer square to the base.',
+    'slag': 'Picture the weld sawn through. Slag inclusions are angular, glassy bits trapped inside the bead. Straight edges and corners are how you tell them from porosity, which is round.',
+    'tungsten-contamination': 'Picture looking down at the run. Dark specks of tungsten are scattered through the weld, and the electrode tip has gone black instead of staying bright.',
+    'spatter': 'Picture looking down at the run. Balls of metal are stuck to the plate either side of the bead. A clean run leaves the plate either side clear.',
+    'technique': 'Picture two runs side by side. One wanders, its width changing as it goes and its ripples uneven. The other holds the same width and the same ripple the whole way. The evenness is the skill.'
+  };
+  function defectLine(id) { return DEFECT_WORDS[id] || null; }
+
+
   /* ---------------------------------------------------------------- lessons */
 
   /* One lesson as an ordered list of things to say. Each entry is
@@ -222,6 +243,7 @@ window.WA_SCRIPT = (function () {
     forSpeech: forSpeech,
     speakNumbers: speakNumbers,
     diagramLine: diagramLine,
+    defectLine: defectLine,
     lesson: lesson,
     unit: unit,
     seconds: seconds

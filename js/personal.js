@@ -130,6 +130,19 @@ window.WA_PERSONAL = (function () {
     '</svg>';
   }
 
+  /* MICK'S OWN ART. The drawn unicorn above was a stand-in until he handed
+     over the real thing — this is his character, the Stealth Terminator
+     Unicorn, and it is the actual joke rather than my approximation of it.
+     The drawing stays as the fallback: if the file ever fails to load the
+     celebration still has something to show rather than an empty box. */
+  var UNICORN_IMG = 'img/mick-unicorn.png';
+
+  function unicornCharacter(size) {
+    var w = size || 170;
+    return '<img class="mick-char" src="' + UNICORN_IMG + '" alt="" width="' + w + '" ' +
+      'onerror="this.outerHTML=WA_PERSONAL.unicornArt(' + w + ')">';
+  }
+
   function unicorn() { return UNICORN; }
 
   /* --------------------------------------------------- Mick's unit sign-offs
@@ -185,6 +198,7 @@ window.WA_PERSONAL = (function () {
     note: note,
     unicorn: unicorn,
     unicornArt: unicornArt,
+    unicornCharacter: unicornCharacter,
     isUnicornLesson: isUnicornLesson,
     unitNote: unitNote,
     attachHiddenNote: attachHiddenNote,

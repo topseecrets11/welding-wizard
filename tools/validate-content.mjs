@@ -10,7 +10,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 
 const sandbox = { window: {} };
-for (const file of ['js/content.js', 'js/reference.js', 'js/diagrams.js',
+for (const file of ['js/content.js', 'js/reference.js', 'js/diagrams.js', 'js/defect-art.js',
                     'js/practice.js', 'js/content-mastery.js', 'js/content-salvage.js', 'js/script.js',
                     'js/sources.js', 'js/dolls.js',
                     'js/teardown.js']) {
@@ -27,6 +27,7 @@ const SC = sandbox.window.WA_SCRIPT;
 const TD = sandbox.window.WA_TEARDOWN;
 const SRC = sandbox.window.WA_SOURCES;
 const DL = sandbox.window.WA_DOLLS;
+const DA = sandbox.window.WA_DEFECT_ART;
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -201,6 +202,30 @@ for (const id of DG?.ids ?? []) {
   if (!SC.diagramLine(id)) fail(`Diagram "${id}" has no spoken description in js/script.js`);
 }
 
+/* ---- fault pictures: Old Mate never names a fault he cannot show ----
+   The whole point of the drawings is that a diagnosis without a picture is a
+   dictionary rather than a teacher, so a defect with no art is a failure, not
+   a gap to fill in later. Orphan art fails too, same as the lesson diagrams. */
+
+for (const d of R.defects ?? []) {
+  const id = d.id ?? d.name;
+  if (!DA?.has(id)) fail(`Defect "${id}" has no picture — Old Mate would name it and show nothing`);
+  if (!SC.defectLine(id)) fail(`Defect "${id}" has a picture but no spoken description, so Drive Mode drops it`);
+}
+for (const id of DA?.ids() ?? []) {
+  const known = (R.defects ?? []).some((d) => (d.id ?? d.name) === id);
+  if (!known) fail(`Fault picture "${id}" does not match any defect`);
+}
+// Both panels, every time: a lone drawing of a fault cannot answer "is mine
+// this one or not?", which is the only question she actually has.
+for (const id of DA?.ids() ?? []) {
+  const svg = DA.get(id);
+  if (!svg.includes('THE FAULT') || !svg.includes('RIGHT')) {
+    fail(`Fault picture "${id}" is missing its fault/right comparison`);
+  }
+  if (!/<figcaption>/.test(svg)) fail(`Fault picture "${id}" has no caption explaining what is drawn`);
+}
+
 /* ---- teardown: every entry has to commit to an answer ---- */
 
 const seenTd = new Set();
@@ -310,6 +335,7 @@ if (errors.length) {
 
 console.log('✓ Content valid');
 console.log(`  ${C.modules.length} modules · ${lessonCount} lessons · ${quizCount} quiz questions`);
+console.log(`  ${DA.ids().length} fault pictures, one per defect, each with spoken words`);
 console.log(`  ${Object.keys(PR).length} bench drills · ${Object.values(PR).reduce((n, e) => n + e.recall.length, 0)} recall cards · ${DG.ids.length} diagrams`);
 console.log(`  ${DL.dolls.length} dolls in the collection`);
 console.log(`  ${SRC.sources.length} linked sources · ${SRC.estimates.length} declared estimates`);

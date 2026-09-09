@@ -275,6 +275,31 @@ function check(name, cond, extra) {
   const topDx = await page.textContent('.card--dx.is-top h3');
   check('porosity ranked top for holes + wind', topDx.includes('Porosity'), { topDx });
   // innerText returns CSS-uppercased text, so match case-insensitively.
+  /* He could name thirteen faults and show her none of them — "that is
+     undercut" to someone who has never seen undercut is a dictionary, not a
+     teacher. Every diagnosis carries a picture now, and it is a comparison
+     because the only question she has at the bench is "is mine this one?". */
+  check('every fault Old Mate can name has a picture of it',
+    await page.evaluate(() =>
+      WA_REFERENCE.defects.every(d => WA_DEFECT_ART.has(d.id || d.name))));
+  check('each one shows the fault against what right looks like',
+    await page.evaluate(() =>
+      WA_DEFECT_ART.ids().every(id => {
+        const s = WA_DEFECT_ART.get(id);
+        return s.includes('THE FAULT') && s.includes('RIGHT') && s.includes('<figcaption>');
+      })));
+  check('the fault drawings speak too, so Drive Mode does not drop them',
+    await page.evaluate(() =>
+      WA_REFERENCE.defects.every(d => {
+        const line = WA_SCRIPT.defectLine(d.id || d.name);
+        return typeof line === 'string' && line.length > 60;
+      })));
+  check('they use the same drawing vocabulary as the lesson diagrams',
+    await page.evaluate(() => {
+      const s = WA_DEFECT_ART.get('porosity');
+      return s.includes('d-plate') && s.includes('d-weld') && s.includes('d-bad');
+    }));
+
   check('results are framed as Old Mate\'s call',
     /what old mate reckons/i.test(await page.evaluate(() => document.body.innerText)));
   check('Field Medic badge', await page.evaluate(() => WA_PROGRESS.hasBadge('field-medic')));
@@ -785,6 +810,15 @@ function check(name, cond, extra) {
   }));
   // The one wink in the app was a bare 🦄, which made it look like every other
   // emoji in here rather than like something put there on purpose.
+  // Mick's own character art, with the drawn one kept as the fallback so a
+  // failed image load leaves a celebration with something in it, not a gap.
+  check("the unicorn egg uses Mick's own character, not my stand-in",
+    await page.evaluate(() => {
+      const html = WA_PERSONAL.unicornCharacter(170);
+      return /<img/.test(html) && html.includes('img/mick-unicorn.png') &&
+             /onerror=/.test(html) && html.includes('unicornArt');
+    }));
+
   check('the unicorn is actually drawn, and picks up her colours', await page.evaluate(() => {
     const art = WA_PERSONAL.unicornArt(120);
     return /^<svg/.test(art) && art.includes('var(--accent)') && art.includes('</svg>');
