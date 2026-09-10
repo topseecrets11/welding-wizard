@@ -41,7 +41,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const ROOT = path.join(__dirname, '..');          // weld-academy/, the static app
+const ROOT = path.join(__dirname, '..');          // repo root, the static app
 const DATA = path.join(__dirname, 'data');
 const PORT = parseInt(process.env.PORT, 10) || 8787;
 const MAX_BODY = 2 * 1024 * 1024;                  // 2 MB — a generous state blob, not a file host
@@ -181,7 +181,7 @@ async function handleAsk(req, res) {
 
 /* ------------------------------------------------------------ static app
  *
- * ROOT is weld-academy/ — which also contains server/, holding this file's
+ * ROOT is the repo root — which also contains server/, holding this file's
  * own source AND the sync data directory. "Serve anything under ROOT" would
  * therefore serve /server/data/<her-sync-code>.json to anyone who requested
  * it, straight past the API entirely — the state blob has no protection

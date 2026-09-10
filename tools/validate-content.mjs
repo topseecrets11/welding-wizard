@@ -1,5 +1,5 @@
 /* Content integrity checks for Weld Academy.
- * Run: node weld-academy/tools/validate-content.mjs
+ * Run: node tools/validate-content.mjs
  * Exits non-zero on any failure. */
 
 import { readFileSync } from 'node:fs';

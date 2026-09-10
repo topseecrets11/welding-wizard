@@ -4,21 +4,12 @@ name: Weld Academy
 # content is structurally sound and the app still works in a real browser.
 on:
   push:
-    paths:
-      - 'weld-academy/**'
-      - '.github/workflows/weld-academy.yml'
   pull_request:
-    paths:
-      - 'weld-academy/**'
-      - '.github/workflows/weld-academy.yml'
 
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: weld-academy
 
     steps:
       - uses: actions/checkout@v4

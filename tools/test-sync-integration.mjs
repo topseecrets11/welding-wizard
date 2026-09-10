@@ -2,7 +2,7 @@
  * (browser context, no shared storage) shows up on a second one after a push
  * and a pull, through the real server — not each half mocked separately.
  *
- * Run: NODE_PATH=/opt/node22/lib/node_modules node weld-academy/tools/test-sync-integration.mjs
+ * Run: NODE_PATH=/opt/node22/lib/node_modules node tools/test-sync-integration.mjs
  */
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';

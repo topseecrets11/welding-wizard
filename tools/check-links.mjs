@@ -5,7 +5,7 @@
  * real, over the network.
  *
  * Kept separate from validate-content.mjs, which must stay offline and instant.
- * Run: node weld-academy/tools/check-links.mjs
+ * Run: node tools/check-links.mjs
  *
  * Some government and standards sites block scripted requests outright (403,
  * or a hang) while working perfectly in a browser. Those are reported as

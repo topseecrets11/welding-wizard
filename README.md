@@ -13,7 +13,6 @@ just informed about it. So: no login, no internet, no install, no build step. Op
 **Quickest (a phone or tablet on your wifi):**
 
 ```bash
-cd weld-academy
 python3 -m http.server 8080
 ```
 
@@ -275,7 +274,7 @@ the browser with zero backend. This adds two things on top, for anyone who wants
 requires it and never nags about it.
 
 ```bash
-node weld-academy/server         # http://localhost:8787 — app + API, one process
+node server         # http://localhost:8787 — app + API, one process
 ```
 
 **Zero npm dependencies.** Only Node's own built-ins (`http`, `https`, `fs`) — `node server` runs it,
@@ -324,8 +323,8 @@ leak by allowing any origin to ask it a question; the wildcard is the correct ch
 not a shortcut taken to make a test pass.
 
 ```bash
-node weld-academy/tools/test-server.mjs              # 22 checks against the server alone
-node weld-academy/tools/test-sync-integration.mjs     # 10 checks, real two-device round trip
+node tools/test-server.mjs              # 22 checks against the server alone
+node tools/test-sync-integration.mjs     # 10 checks, real two-device round trip
 ```
 
 ---
@@ -372,7 +371,7 @@ existing celebration; there is nothing to tap at, and the page says so.
 ## Files
 
 ```
-weld-academy/
+(repo root)
   index.html                 shell — loads nine plain scripts, no modules, no build
   manifest.json              PWA manifest (installable, standalone, shortcuts)
   service-worker.js          cache-first offline
@@ -431,13 +430,13 @@ also share a gradient and glow palette (`#gPlate`, `#gWeld`, `#gTung`, `#fGlow`,
 **Checks:**
 
 ```bash
-node weld-academy/tools/validate-content.mjs     # quiz indices, drill/recall coverage, clue wiring,
+node tools/validate-content.mjs     # quiz indices, drill/recall coverage, clue wiring,
                                                  # diagram map, badge coverage, table shapes,
                                                  # spoken scripts, teardown verdicts, source links,
                                                  # doll reachability, offline cache completeness
-node weld-academy/tools/e2e-smoke.cjs            # 195 checks: full walkthrough in headless Chromium
-node weld-academy/tools/check-links.mjs          # every source link, for real, over the network
-WA_SHOTS=/tmp/shots node weld-academy/tools/e2e-smoke.cjs   # ...and capture screenshots
+node tools/e2e-smoke.cjs            # 195 checks: full walkthrough in headless Chromium
+node tools/check-links.mjs          # every source link, for real, over the network
+WA_SHOTS=/tmp/shots node tools/e2e-smoke.cjs   # ...and capture screenshots
 ```
 
 The smoke test needs Playwright available (`NODE_PATH=/usr/lib/node_modules` if it is installed

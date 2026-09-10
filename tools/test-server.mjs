@@ -3,7 +3,7 @@
  * tested only for its no-key response; hitting the real Anthropic API is not
  * something a test suite should do on every run).
  *
- * Run: node weld-academy/tools/test-server.mjs
+ * Run: node tools/test-server.mjs
  */
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
