@@ -11,6 +11,7 @@ const root = join(here, '..');
 
 const sandbox = { window: {} };
 for (const file of ['js/content.js', 'js/reference.js', 'js/diagrams.js', 'js/defect-art.js',
+                    'js/videos.js',
                     'js/practice.js', 'js/content-mastery.js', 'js/content-salvage.js', 'js/script.js',
                     'js/sources.js', 'js/dolls.js',
                     'js/teardown.js']) {
@@ -28,6 +29,7 @@ const TD = sandbox.window.WA_TEARDOWN;
 const SRC = sandbox.window.WA_SOURCES;
 const DL = sandbox.window.WA_DOLLS;
 const DA = sandbox.window.WA_DEFECT_ART;
+const VD = sandbox.window.WA_VIDEOS;
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -226,6 +228,26 @@ for (const id of DA?.ids() ?? []) {
   if (!/<figcaption>/.test(svg)) fail(`Fault picture "${id}" has no caption explaining what is drawn`);
 }
 
+/* ---- video references: an empty entry is fine, a wrong one is not ----
+   Unlike the fault pictures, a video is never required — the whole app has
+   to keep working with no signal, and a clip can't. So an entry with no
+   youtubeId yet is not a failure. What IS a failure: a key that doesn't
+   match a real defect (a typo would silently never show), or a filled-in
+   entry missing the timing/label it needs to actually play. */
+for (const id of Object.keys(VD?.CLIPS ?? {})) {
+  const known = (R.defects ?? []).some((d) => (d.id ?? d.name) === id);
+  if (!known) fail(`Video reference "${id}" does not match any defect`);
+}
+for (const id of Object.keys(VD?.CLIPS ?? {})) {
+  const c = VD.CLIPS[id];
+  if (!c.youtubeId) continue; // not filmed yet — nothing to check
+  if (!c.label) fail(`Video "${id}" has a youtubeId but no label`);
+  if (typeof c.start !== 'number' || c.start < 0) fail(`Video "${id}" has an invalid start time`);
+  if (c.end != null && (typeof c.end !== 'number' || c.end <= c.start)) {
+    fail(`Video "${id}" has an end time that isn't after its start time`);
+  }
+}
+
 /* ---- teardown: every entry has to commit to an answer ---- */
 
 const seenTd = new Set();
@@ -336,6 +358,7 @@ if (errors.length) {
 console.log('✓ Content valid');
 console.log(`  ${C.modules.length} modules · ${lessonCount} lessons · ${quizCount} quiz questions`);
 console.log(`  ${DA.ids().length} fault pictures, one per defect, each with spoken words`);
+console.log(`  ${Object.values(VD.CLIPS).filter((c) => c.youtubeId).length} of ${Object.keys(VD.CLIPS).length} defects have a filmed reference clip`);
 console.log(`  ${Object.keys(PR).length} bench drills · ${Object.values(PR).reduce((n, e) => n + e.recall.length, 0)} recall cards · ${DG.ids.length} diagrams`);
 console.log(`  ${DL.dolls.length} dolls in the collection`);
 console.log(`  ${SRC.sources.length} linked sources · ${SRC.estimates.length} declared estimates`);

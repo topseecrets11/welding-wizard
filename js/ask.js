@@ -40,10 +40,10 @@ window.WA_ASK = (function () {
      says what it mentions. Scoring them separately is the difference between
      "spatter" finding the spatter write-up and finding a lesson that happens to
      use the word twice. */
-  function add(kind, title, head, body, where, href) {
+  function add(kind, title, head, body, where, href, id) {
     if (!head && !body) return;
     docs.push({
-      kind: kind, title: title,
+      kind: kind, title: title, id: id || '',
       head: String(head || ''),
       text: String(body || ''),
       where: where || '', href: href || ''
@@ -79,7 +79,7 @@ window.WA_ASK = (function () {
           [d.name, d.plain].join(' '),
           [(d.causes || []).join(' '), (d.fixNow || []).join(' '),
            (d.prevent || []).join(' '), d.processNote].join(' '),
-          'Old Mate', '#/doctor');
+          'Old Mate', '#/doctor', d.id);
     });
 
     (R && R.cheatsheets || []).forEach(function (s) {
@@ -364,7 +364,8 @@ window.WA_ASK = (function () {
           title: h.doc.title,
           where: h.doc.where,
           href: h.doc.href,
-          kind: h.doc.kind
+          kind: h.doc.kind,
+          id: h.doc.id
         };
       })
     };
@@ -466,7 +467,8 @@ window.WA_ASK = (function () {
             title: base.answers[0].title,
             where: base.answers[0].where,
             href: base.answers[0].href,
-            kind: 'ai'
+            kind: 'ai',
+            id: base.answers[0].id
           }],
           also: base.answers.slice(1)
         };
