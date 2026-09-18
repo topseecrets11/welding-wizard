@@ -1075,6 +1075,57 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
   .sheet-panel, .sheet-back { transition: none; }
 }
 
+/* -------------------------------------------------------------- video pip */
+
+/* Tappable only once a real clip exists for the id — see js/videos.js. Sits
+   wherever a defect write-up or an Old Mate answer wants to offer "watch the
+   real thing" without committing to it being there. */
+.video-chip {
+  display: block; width: 100%; text-align: center; cursor: pointer;
+  margin: 4px 0 14px; padding: 11px 14px;
+  background: var(--accent-tint); border: 1px solid rgba(var(--accent-glow),.4);
+  border-radius: 11px; color: var(--accent-2); font: inherit; font-weight: 750; font-size: 14px;
+}
+.video-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* A small floating player docked in a corner, not a sheet — the point of
+   picture-in-picture is that it can keep running while she reads or taps
+   around underneath it. */
+.video-pip {
+  position: fixed; right: 12px; bottom: calc(var(--tab-h) + 8px + env(safe-area-inset-bottom, 0px));
+  width: min(280px, calc(100vw - 24px)); z-index: 260;
+  background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 14px;
+  box-shadow: var(--shadow-lg); overflow: hidden;
+  opacity: 0; transform: translateY(16px) scale(.96);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.video-pip.is-open { opacity: 1; transform: translateY(0) scale(1); }
+.video-pip-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 8px 9px 12px; background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.video-pip-t {
+  font-size: 12.5px; font-weight: 750; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.video-pip-x {
+  flex: none; width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+  background: var(--card-2); border: 1px solid var(--line);
+  color: var(--muted); font-size: 12px; line-height: 1;
+}
+.video-pip-body { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+.video-pip-body iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-pip-alt {
+  display: block; padding: 8px 12px; font-size: 12px; color: var(--muted);
+  background: var(--card); border-top: 1px solid var(--line);
+}
+.video-pip-alt:hover { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .video-pip { transition: none; }
+}
+
 /* ------------------------------------------------------------ voice persona */
 
 .persona-row { display: grid; gap: 9px; margin: 12px 0; }

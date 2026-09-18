@@ -665,6 +665,89 @@ function check(name, cond, extra) {
     (await page.locator('.ask-src').count()) === 1);
   await shot(page, '20-ask.png');
 
+  /* ---------- video references (js/videos.js) ----------------------------
+   * Deliberately empty until real clips are filmed — the app has to keep
+   * working with no signal, and video can never keep that promise, so it
+   * can never become required the way the fault pictures are. These prove
+   * the module and its wiring hold up on both sides of that: quiet when
+   * nothing is filmed, and correct the moment something is. */
+  check('every video reference key matches a real defect',
+    await page.evaluate(() => WA_VIDEOS.ids().every(id =>
+      WA_REFERENCE.defects.some(d => (d.id || d.name) === id))));
+  check('every defect has a video slot waiting, even an empty one',
+    await page.evaluate(() => WA_REFERENCE.defects.every(d => WA_VIDEOS.ids().includes(d.id || d.name))));
+  check('nothing is filmed yet, so nothing claims to have a clip',
+    await page.evaluate(() => WA_VIDEOS.ids().every(id => !WA_VIDEOS.has(id))));
+  check('a clip starting at 0:00 still counts as a real timestamp, not "unset"',
+    await page.evaluate(() => {
+      WA_VIDEOS.CLIPS.__t = { youtubeId: 'x', start: 0, end: 5, label: 't' };
+      const url = WA_VIDEOS.embedUrl('__t');
+      delete WA_VIDEOS.CLIPS.__t;
+      return url.includes('start=0');
+    }));
+
+  await page.goto(APP + '#/doctor');
+  await page.waitForSelector('.clue');
+  await dismiss(page);
+  check('an unfilmed defect sheet shows no watch chip', (await page.locator('.video-chip').count()) === 0);
+
+  // Inject a real clip and prove the whole path lights up — chip, pip,
+  // correct start/end in the embed, the plain YouTube fallback link, and a
+  // clean close — then put it back exactly as it was, same discipline as
+  // the doll and unicorn peeks: a test must never leave state another test
+  // depends on.
+  await page.evaluate(() => {
+    WA_VIDEOS.CLIPS.porosity = Object.assign({}, WA_VIDEOS.CLIPS.porosity,
+      { youtubeId: 'dQw4w9WgXcQ', start: 5, end: 40 });
+  });
+  await page.click('.clue:has(input[data-clue="holes"])');
+  await page.click('.clue:has(input[data-clue="windy"])');
+  await page.click('#dxBtn');
+  await page.waitForSelector('.card--dx');
+  await dismiss(page);
+  await page.click('.card--dx.is-top [data-dx]');
+  await page.waitForSelector('.sheet.is-open');
+  check('once filmed, the same defect sheet shows a watch chip',
+    (await page.locator('.sheet .video-chip').count()) === 1);
+  await page.click('.sheet .video-chip');
+  await page.waitForSelector('.video-pip.is-open');
+  check('the pip embeds the right clip, seeked to its real start and end',
+    await page.evaluate(() => {
+      const src = document.querySelector('.video-pip iframe').src;
+      return src.includes('dQw4w9WgXcQ') && src.includes('start=5') && src.includes('end=40');
+    }));
+  check('it offers a plain link out to YouTube too, at the same timestamp',
+    /youtube\.com\/watch.*[?&]t=5s/.test(await page.getAttribute('.video-pip-alt', 'href')));
+  await page.click('.video-pip-x');
+  await page.waitForSelector('.video-pip', { state: 'detached' });
+  check('closing the pip leaves the sheet underneath untouched',
+    (await page.locator('.sheet.is-open .dx-sec--fix li').count()) > 0);
+  await page.click('.sheet-x');
+  await page.waitForSelector('.sheet', { state: 'detached' });
+
+  await page.evaluate(() => {
+    WA_VIDEOS.CLIPS.porosity = Object.assign({}, WA_VIDEOS.CLIPS.porosity, { youtubeId: '' });
+  });
+  check('and the reset leaves it exactly as unfilmed as before',
+    await page.evaluate(() => !WA_VIDEOS.has('porosity')));
+
+  // Ask Old Mate gets the same chip, off the same data — proven by asking a
+  // porosity question with the clip still injected for just this one check.
+  await page.evaluate(() => {
+    WA_VIDEOS.CLIPS.porosity = Object.assign({}, WA_VIDEOS.CLIPS.porosity, { youtubeId: 'dQw4w9WgXcQ' });
+  });
+  await page.goto(APP + '#/doctor');
+  await page.waitForSelector('#askBox');
+  await dismiss(page);
+  await page.fill('#askBox', 'why is my weld full of little holes');
+  await page.click('#askGo');
+  await page.waitForSelector('.ask-answer');
+  check('a matched Ask Old Mate answer shows the same watch chip',
+    (await page.locator('.ask-answer .video-chip').count()) === 1);
+  await page.evaluate(() => {
+    WA_VIDEOS.CLIPS.porosity = Object.assign({}, WA_VIDEOS.CLIPS.porosity, { youtubeId: '' });
+  });
+
   /* ---------- drive mode ---------- */
   await page.goto(APP + '#/drive');
   await page.waitForSelector('.tile-btn[data-tile^="drive:"]');

@@ -34,6 +34,7 @@
   var SY = window.WA_SYNC;
   var OM = window.WA_OLDMATE;
   var DA = window.WA_DEFECT_ART;
+  var VD = window.WA_VIDEOS;
 
   var view, header, tabbar, toastHost;
   var autoReadTimer = null;        // pending auto-start of the reader
@@ -179,6 +180,56 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && sheetEl) closeSheet();
   });
+
+  /* ============================ video pip ================================
+   * A small floating reference clip, docked in a corner — deliberately not
+   * another sheet, because the point of picture-in-picture is that she can
+   * keep it running while she reads or taps around underneath it, the way
+   * any real PiP player behaves. Nothing is fetched — not even a thumbnail —
+   * until this is actually called, so an unfilmed topic costs nothing.
+   * ====================================================================== */
+
+  var pipEl = null;
+
+  function closeVideoPip() {
+    if (!pipEl) return;
+    var el = pipEl;
+    pipEl = null;
+    el.classList.remove('is-open');
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 200);
+  }
+
+  function openVideoPip(id) {
+    if (!VD) return;
+    var c = VD.get(id);
+    if (!c || !c.youtubeId) return;
+    closeVideoPip();
+
+    var el = document.createElement('div');
+    el.className = 'video-pip';
+    el.innerHTML =
+      '<div class="video-pip-head">' +
+        '<span class="video-pip-t">▶ ' + esc(c.label || 'Reference clip') + '</span>' +
+        '<button class="video-pip-x" aria-label="Close">✕</button>' +
+      '</div>' +
+      '<div class="video-pip-body">' +
+        '<iframe src="' + VD.embedUrl(id) + '" title="' + esc(c.label || 'Reference clip') +
+          '" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>' +
+      '</div>' +
+      '<a class="video-pip-alt" href="' + VD.watchUrl(id) + '" target="_blank" rel="noopener">Open on YouTube instead →</a>';
+    document.body.appendChild(el);
+    pipEl = el;
+    requestAnimationFrame(function () { el.classList.add('is-open'); });
+
+    el.querySelector('.video-pip-x').addEventListener('click', function () { tap(); closeVideoPip(); });
+  }
+
+  /* A tappable chip, only ever rendered when a real clip exists for this id —
+     for an unfilmed topic this returns '' and nothing shows at all. */
+  function videoChipHtml(id) {
+    if (!VD || !VD.has(id)) return '';
+    return '<button class="video-chip" data-video-chip="' + esc(id) + '">▶ Watch the real thing</button>';
+  }
 
   /* ============================ toasts ================================== */
 
@@ -1535,6 +1586,7 @@
     host.innerHTML =
       '<div class="ask-answer' + (res.ok ? '' : ' is-stumped') + '">' +
         '<p class="ask-text">' + esc(first.text) + '</p>' +
+        videoChipHtml(first.id) +
         (first.href ? '<a class="ask-src" href="' + first.href + '">' +
           (first.title ? esc(first.title) : 'Read it properly') +
           (first.where ? ' · ' + esc(first.where) : '') + ' →</a>' : '') +
@@ -1553,6 +1605,9 @@
       N.setScript([{ text: first.text }]);
       N.play(0);
     }
+
+    var chip = host.querySelector('[data-video-chip]');
+    if (chip) chip.addEventListener('click', function () { tap(); openVideoPip(first.id); });
 
     var more = (res.also || res.answers.slice(1));
     var moreHost = host.querySelector('.ask-more');
@@ -1665,12 +1720,13 @@
   function openDefectSheet(id) {
     var d = R.defects.filter(function (x) { return (x.id || x.name) === id; })[0];
     if (!d) return;
-    openSheet(d.icon + ' ' + d.name,
+    var el = openSheet(d.icon + ' ' + d.name,
       '<p class="dx-sev">' + esc(d.severity) + '</p>' +
       // The picture goes above the words, not below them. She opened this
       // holding the real thing and the only question she has is whether hers
       // matches — reading three paragraphs first is the wrong order.
       (DA.has(id) ? DA.get(id) : '') +
+      videoChipHtml(id) +
       '<p class="dx-plain">' + esc(d.plain) + '</p>' +
       '<div class="dx-sec"><b>Why it happened</b><ul>' +
         d.causes.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></div>' +
@@ -1679,6 +1735,8 @@
       '<div class="dx-sec"><b>Stop it happening again</b><ul>' +
         d.prevent.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></div>' +
       '<p class="dx-note">' + esc(d.processNote) + '</p>');
+    var chip = el.querySelector('[data-video-chip]');
+    if (chip) chip.addEventListener('click', function () { tap(); openVideoPip(id); });
   }
 
   function showDiagnosis(clueIds) {
